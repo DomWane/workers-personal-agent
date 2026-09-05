@@ -15,8 +15,8 @@ measured and written down.
 
 - A Cloudflare account. The free plan is enough.
 - Cloudflare Access in front of the Worker — free, two minutes, [explained below](#before-you-deploy-cloudflare-access).
-- A model. The committed config points at OpenRouter and needs its key; delete `LLM_BASE_URL` and
-  Workers AI answers instead, with nothing else to set up.
+- A model. The committed config uses Workers AI (`@cf/zai-org/glm-4.7-flash`, 131k context), so
+  there is nothing else to set up. Any OpenAI-compatible endpoint is one var and one secret away.
 
 Web search runs keyless on Tavily and Firecrawl; a key for either only raises its rate limit.
 
@@ -154,7 +154,7 @@ Set locally in `.env`, which `wrangler dev` and the `eval:*` scripts both read; 
 | :--- | :--- |
 | `CF_ACCOUNT_ID` | The account the calls below go to. |
 | `CF_API_TOKEN` | One token with **Workers AI: Read** (catalogue and, by default, chat), **Browser Rendering: Edit** (`read_page`) and **Billing: Read** (the hourly plan lookup that sizes the subrequest budget; without it the lookup assumes the Free plan's 50). Add **Account Analytics: Read** only for `pnpm eval:traces`. |
-| `LLM_API_KEY` | Only when `LLM_BASE_URL` points somewhere other than Cloudflare. |
+| `LLM_API_KEY` | Only when `LLM_BASE_URL` points somewhere other than Cloudflare. Not in `.env.example`, so the button never asks for it. |
 | `TAVILY_API_KEY` | Optional. Search runs keyless without it at a rate limit Tavily does not publish; with a key, 100 requests a minute. Tavily leads the chain. |
 | `FIRECRAWL_API_KEY` | Optional. The second search vendor and the `read_page` fallback, keyless at 1,000 credits a month. |
 
@@ -164,8 +164,8 @@ Set in `wrangler.jsonc`.
 
 | Var | Default | What it does |
 | :--- | :--- | :--- |
-| `LLM_BASE_URL` | OpenRouter | Omit it to use Workers AI; `LLM_MODEL` then has to be a `@cf/` id. |
-| `LLM_MODEL` | `deepseek/deepseek-v4-flash` | The model that answers when nothing overrides it; the picker in the UI overrides it per thread. |
+| `LLM_BASE_URL` | unset | Unset means Workers AI and a `@cf/` id in `LLM_MODEL`. Set it to any OpenAI-compatible endpoint, with its key in `LLM_API_KEY`. |
+| `LLM_MODEL` | `@cf/zai-org/glm-4.7-flash` | The model that answers when nothing overrides it; the picker in the UI overrides it per thread. |
 | `ENVIRONMENT` | `production` | `localhost` opens the Access gate and the dev routes. Nothing else is meaningful; the embedding index runs only under `production`. |
 | `VAULT_AGENT_DIR` | `agent` | Key prefix inside the R2 bucket the memory lives in. |
 | `LOG_CONTENT` | `"true"` | **An opinion, not a neutral default.** Puts message bodies, tool arguments and tool results into the logs for the three days Workers Logs keeps them. Anything but `"true"` or `"1"` turns it off. |
@@ -265,7 +265,7 @@ measured, is in [ARCHITECTURE.md](ARCHITECTURE.md).
 | :--- | :--- | :--- | :--- | :--- |
 | External subrequests per invocation | 50 | a chat turn with many tool calls; a research round | counts every call against a budget and stops the loop before the 51st, saying so | Workers Paid: 10,000 |
 | Browser Rendering (`read_page`) | 1 request / 10 s, 10 min of browser time a day | a research wave — a single round outruns it | falls back to Firecrawl and logs `why`; the report counts pages it could not open | Workers Paid |
-| Workers AI | 10,000 neurons a day | a deep research run on a `@cf/` model | the provider answers 429 and the turn is reported as failed | Workers Paid, or `LLM_BASE_URL` pointed elsewhere |
+| Workers AI | 10,000 neurons a day | a deep research run on the default model | the provider answers 429 and the turn is reported as failed | Workers Paid, or `LLM_BASE_URL` pointed elsewhere |
 | Web search without a key | Tavily: rate-limited, number unpublished · Firecrawl: 1,000 credits a month | a research run on a deploy with no search secret | a refused search is reported as a tool fault, never as an empty web | `TAVILY_API_KEY`: 100 requests a minute · `FIRECRAWL_API_KEY`: 10 a minute |
 | Durable Object CPU | 30 s per request | far beyond anything here; brute-force cosine over the vault is milliseconds | — | — |
 
@@ -304,8 +304,9 @@ read their half.
 
 ## Troubleshooting
 
-**The UI loads but nothing answers.** Check `wrangler tail`. A missing or wrong `LLM_API_KEY` shows
-as a 401 from the provider; an empty model picker usually means the same key cannot read the
+**The UI loads but nothing answers.** Check `wrangler tail`. A 401 from the provider is the
+credential: `CF_API_TOKEN` without Workers AI: Read on the default, or a missing `LLM_API_KEY` with
+`LLM_BASE_URL` set. An empty model picker usually means the same credential cannot read the
 catalogue.
 
 **`read_page` keeps falling back.** Browser Rendering on the Free plan allows one request every ten

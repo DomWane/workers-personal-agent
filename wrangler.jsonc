@@ -42,9 +42,10 @@
   "r2_buckets": [{ "binding": "VAULT", "bucket_name": "personal-agent-vault" }],
   // CF_ACCOUNT_ID is a secret rather than a var: it identifies the account, and `vars` are
   // committed in plain text.
+  // No LLM_BASE_URL: Workers AI answers with CF_API_TOKEN alone. Any OpenAI-compatible endpoint
+  // is one var plus the LLM_API_KEY secret.
   "vars": {
-    "LLM_BASE_URL": "https://openrouter.ai/api/v1",
-    "LLM_MODEL": "deepseek/deepseek-v4-flash",
+    "LLM_MODEL": "@cf/zai-org/glm-4.7-flash",
     "ENVIRONMENT": "production",
     "VAULT_AGENT_DIR": "agent",
     "LOG_CONTENT": "true"

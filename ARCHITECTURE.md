@@ -321,10 +321,11 @@ on the way *in* once archived the wrong file.
 
 The two things a fresh deploy gets wrong if nobody says them, and both are deliberate.
 
-- **The committed defaults are opinions, not neutral.** `LLM_BASE_URL` points at OpenRouter — omit
-  it, point `LLM_MODEL` at a `@cf/` model, and Workers AI answers with no second key — and
-  `LOG_CONTENT` is on, which means message bodies, tool arguments and tool results reach the logs.
-  Both are one line in `wrangler.jsonc`.
+- **The committed defaults are opinions, not neutral.** `LLM_BASE_URL` is unset, so Workers AI
+  answers with `CF_API_TOKEN` alone and `LLM_MODEL` is a `@cf/` id — set the var to any
+  OpenAI-compatible endpoint and add `LLM_API_KEY` to leave it — and `LOG_CONTENT` is on, which
+  means message bodies, tool arguments and tool results reach the logs. Both are one line in
+  `wrangler.jsonc`.
 - Cloudflare Access is **decided and lives outside this repository**, and it must be the
   **hostname-based** kind: a worker-level policy 403s WebSocket upgrades, which is all this client
   does. `ctx.access` is empty here either way — the assets router does not pass it — so the signal
