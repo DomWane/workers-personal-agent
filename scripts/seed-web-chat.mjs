@@ -151,7 +151,6 @@ const bulkTurns = (n) =>
 const chatState = {
   messages,
   channel: { kind: 'web' },
-  modelOverride: 'anthropic/claude-sonnet-5',
   historySummary:
     'The user set up the agent on Cloudflare Workers and measured the free-tier limits with a throwaway probe Worker. ' +
     'Decisions: research runs fan out into scout Durable Objects, Tavily leads the search chain, and the run is bounded by a five-minute deadline rather than a round floor.',
@@ -219,8 +218,13 @@ const title = arg('--title', scenario === 'chat' ? 'Cloudflare free-tier limits'
 // and keeps it. Seeding without it leaves the threshold measured against the conservative default,
 // which for a model *smaller* than that default is the difference between the scenario firing and
 // silently doing nothing.
+const catalogue =
+  scenario === 'chat' || state.modelOverride ? await fetch(new URL('/api/models', base)).then((r) => r.json()) : null
+// The picture shows whatever this deployment answers with, never a model it could not call.
+if (scenario === 'chat') {
+  state.modelOverride = catalogue.current
+}
 if (state.modelOverride) {
-  const catalogue = await fetch(new URL('/api/models', base)).then((r) => r.json())
   const row = catalogue.models?.find((m) => m.id === state.modelOverride)
   if (row?.context) {
     state.contextModel = state.modelOverride
