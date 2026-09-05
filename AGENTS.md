@@ -25,11 +25,11 @@ pnpm format        # oxfmt in place; format:check is the read-only form
 pnpm build:web     # vite build web → ./public (gitignored; wrangler serves it)
 pnpm dev           # wrangler dev — needs `cloudflared` once Access is on the account, see below
 pnpm dev:web       # vite with hot reload, proxying /agents to :8787
-pnpm deploy        # wrangler deploy — User runs this, not the agent
+pnpm run deploy    # wrangler deploy — User runs this, not the agent; bare `pnpm deploy` is pnpm's builtin
 ```
 
 `./public` is build output and gitignored. `wrangler.jsonc` names `pnpm build:web` as the custom
-build, so `pnpm dev` and `pnpm deploy` both produce it; run it by hand only outside wrangler.
+build, so `pnpm dev` and `pnpm run deploy` both produce it; run it by hand only outside wrangler.
 
 **`pnpm dev` needs `cloudflared` and a terminal once Cloudflare Access is on the account**
 (2026-08-23). The `ai` binding has no local simulator, so dev opens a remote proxy session against

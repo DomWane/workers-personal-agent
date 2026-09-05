@@ -123,7 +123,7 @@ and not as the number you will see in a log.
 Vectorize is unresolved: the pricing page says "only available on the Workers paid plan" and one
 paragraph below shows a Workers Free column. Untested, not needed yet.
 
-**A `pnpm deploy` does not mean the next request runs the new code.** A live Durable Object keeps
+**A `pnpm run deploy` does not mean the next request runs the new code.** A live Durable Object keeps
 running its old version until the instance restarts. On 2026-08-06 a fix was deployed, the next
 invocation 22 seconds later still ran the old code, and the new one took effect about five minutes
 later once the DO had gone idle. Half an hour went into looking for a bug in code that was

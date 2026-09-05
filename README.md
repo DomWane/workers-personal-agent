@@ -69,7 +69,7 @@ pnpm wrangler r2 bucket create personal-agent-vault   # the bucket named in wran
 pnpm wrangler secret put CF_ACCOUNT_ID
 pnpm wrangler secret put CF_API_TOKEN
 pnpm wrangler secret put LLM_API_KEY                   # only with LLM_BASE_URL set
-pnpm deploy                                            # builds the client first, via build.command
+pnpm run deploy         # `run` matters: bare `pnpm deploy` is pnpm's own command, not this script
 ```
 
 Either way, the first deploy opens on a page that says the agent is closed and lists the three
