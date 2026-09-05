@@ -1,0 +1,18 @@
+node_modules/
+# wrangler dev and the eval scripts read .env; a stray .dev.vars would silently win over it
+.env
+.env.*
+!.env.example
+.dev.vars*
+.wrangler/
+worker-configuration.d.ts
+.DS_Store
+
+# `pnpm build:web` output; wrangler serves it and builds it on deploy
+public/
+
+# Harness output: the corpus, labels, vectors and judgments. Never published.
+evals/data/
+
+# Working material — plans, notes, and the local-only half of the evals.
+internal/

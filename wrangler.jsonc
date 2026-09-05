@@ -1,0 +1,52 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "personal-agent",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // `public/` is gitignored, so `wrangler dev` and a CLI deploy have to build the client first or
+  // they ship an empty asset directory. Workers Builds ignores this block and runs the `build`
+  // script from package.json instead, so the Deploy button builds twice; a few seconds, accepted.
+  "build": { "command": "pnpm build:web" },
+  // Nightly maintenance: one reconcile-and-reflect for the whole vault, not one per conversation.
+  "triggers": { "crons": ["0 4 * * *"] },
+  "durable_objects": {
+    "bindings": [
+      { "name": "PERSONAL_AGENT", "class_name": "PersonalAgent" },
+      { "name": "RESEARCH_SCOUT", "class_name": "ResearchScout" },
+      { "name": "MAINTENANCE", "class_name": "MaintenanceAgent" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PersonalAgent"] },
+    { "tag": "v2", "new_sqlite_classes": ["ResearchScout"] },
+    { "tag": "v3", "new_sqlite_classes": ["MaintenanceAgent"] }
+  ],
+  // `run_worker_first` is the guard against the asset server swallowing routes: without it a
+  // static 404/SPA page answers them and the Worker never sees the request. It has bitten twice,
+  // and the symptom is HTML where JSON was expected rather than a 404.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/agents/*", "/api/*", "/admin/*", "/dev/*"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": true }
+  },
+  "ai": { "binding": "AI" },
+  // Measured 2026-08-06: R2 binding calls do not count against the Free plan's 50 external
+  // subrequests (200/200 passed), while `env.AI.run` does (dies at 51, like `fetch`).
+  "r2_buckets": [{ "binding": "VAULT", "bucket_name": "personal-agent-vault" }],
+  // CF_ACCOUNT_ID is a secret rather than a var: it identifies the account, and `vars` are
+  // committed in plain text.
+  "vars": {
+    "LLM_BASE_URL": "https://openrouter.ai/api/v1",
+    "LLM_MODEL": "deepseek/deepseek-v4-flash",
+    "ENVIRONMENT": "production",
+    "VAULT_AGENT_DIR": "agent",
+    "LOG_CONTENT": "true"
+  }
+}
