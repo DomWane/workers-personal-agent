@@ -1,0 +1,11 @@
+turnId,source,model,provider,outcome,stopReason,roundsUsed,toolCalls,empty,subrequests,elapsedMs,inputTokens,outputTokens,reasoningTokens
+8337db20,reindex,,,,,0,0,0,,,,,
+b89e02bc,reindex,,,,,0,0,0,,,,,
+65d78159,reindex,,,,,0,0,0,,,,,
+9f68a77b,reindex,,,,,0,0,0,,,,,
+10150b5a,telegram,deepseek/deepseek-v4-flash,StreamLake,ok,complete,2,1,0,9,22370,6633,703,257
+66ac31a6,telegram,deepseek/deepseek-v4-flash,StreamLake,ok,complete,2,1,0,8,15050,6615,389,130
+78ced681,telegram,deepseek/deepseek-v4-flash,Baidu,ok,complete,2,1,0,8,15499,9892,1241,49
+ba24887f,telegram,deepseek/deepseek-v4-flash,Baidu,ok,complete,2,1,0,8,17938,12342,1631,122
+8762c52e,telegram,deepseek/deepseek-v4-flash,Baidu,ok,complete,2,1,0,11,27948,15043,2959,120
+b5946857,telegram,deepseek/deepseek-v4-flash,StreamLake,error,error,5,22,0,55,,91113,1581,584
