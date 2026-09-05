@@ -44,9 +44,9 @@ function accessRefusal(request: Request, env: Env): Response | undefined {
       error: 'closed',
       detail:
         'Cloudflare Access is not in front of this Worker, so it refuses to serve rather than open your vault to whoever finds the URL.\n\n' +
-        '1. Cloudflare dashboard → Zero Trust → Access controls → Applications → Add → Self-hosted\n' +
-        '2. Pick the Workers destination and this Worker, so its workers.dev hostname is covered\n' +
-        '3. Add a policy allowing your email — one-time PIN needs no identity provider\n\n' +
+        '1. Workers & Pages → this Worker → Access → Protect this Worker behind Access, scope All traffic\n' +
+        '   (or Zero Trust → Access controls → Applications → Add → Self-hosted → Workers destination, this Worker)\n' +
+        '2. Add a policy allowing your email — one-time PIN needs no identity provider\n\n' +
         'Then reload this page. To run it open on purpose instead, set the var ALLOW_UNPROTECTED=true and redeploy.',
     },
     { status: 503 },

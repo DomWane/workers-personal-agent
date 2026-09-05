@@ -326,9 +326,11 @@ The two things a fresh deploy gets wrong if nobody says them, and both are delib
   OpenAI-compatible endpoint and add `LLM_API_KEY` to leave it — and `LOG_CONTENT` is on, which
   means message bodies, tool arguments and tool results reach the logs. Both are one line in
   `wrangler.jsonc`.
-- Cloudflare Access is **decided and lives outside this repository**, and it must be the
-  **hostname-based** kind: a worker-level policy 403s WebSocket upgrades, which is all this client
-  does. `ctx.access` is empty here either way — the assets router does not pass it — so the signal
+- Cloudflare Access is **decided and lives outside this repository**, as a self-hosted application
+  attached to the Worker (a `worker` destination, the kind the Deploy flow's switch creates). The
+  Workers docs say that kind refuses WebSocket upgrades with 403; measured 2026-08-23 and
+  2026-09-05, it passes them, and this client is nothing but a WebSocket. `ctx.access` is empty
+  here either way — the assets router does not pass it — so the signal
   is the `Cf-Access-Jwt-Assertion` header, and `accessRefusal` in [src/index.ts](src/index.ts)
   **refuses with 503** when it is missing rather than warning. `ALLOW_UNPROTECTED=true` is the
   deliberate way out and logs on every request. **Both paths measured 2026-08-23**: with a policy

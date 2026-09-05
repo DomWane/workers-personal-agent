@@ -29,11 +29,16 @@ The next step, if the presence check ever needs to stand on its own, is verifyin
 Cloudflare's JWKS — one function, and the seam for it is `accessRefusal`. `ALLOW_UNPROTECTED=true`
 is the deliberate way to run open, and it logs on every request that uses it.
 
-**It has to be the hostname-based kind, and that is not a preference.**
+**The application is attached to the Worker, and the docs' WebSocket warning did not hold.**
 [The Workers Access docs](https://developers.cloudflare.com/workers/configuration/cloudflare-access/)
-say it outright: *"Worker-level Access policies do not currently support WebSocket connections.
-WebSocket upgrade requests to a Worker protected by a worker-level Access policy will fail with a
-`403` error."* This client is nothing but a WebSocket. The same page rules out reading the identity
+say: *"Worker-level Access policies do not currently support WebSocket connections. WebSocket
+upgrade requests to a Worker protected by a worker-level Access policy will fail with a `403`
+error."* The application in front of this deployment is exactly that kind — `destinations:
+[{type: "worker"}]`, and the Worker's own Access tab lists it as the switch's application, so the
+Deploy flow's switch and a Zero Trust self-hosted application with the Workers destination are one
+object — and this client is nothing but a WebSocket. Measured on 2026-08-23 and again on 2026-09-05, the upgrade passes and the chat runs
+over it. The warning is quoted because it is the docs' current text; if the `403` ever appears, a
+hostname-based application listing every hostname is the fallback. The same page rules out reading the identity
 from the runtime — *"the router does not pass `ctx.access` to the user Worker"* — for a Worker with
 Static Assets configured, which this is. So the header is the only signal available.
 

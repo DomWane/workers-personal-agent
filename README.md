@@ -32,20 +32,17 @@ agent's notes, finished research reports. That is fine for one user, which is wh
 It also means the Worker **refuses to serve until Cloudflare Access is in front of it** — a fresh
 deploy answers `503` with instructions instead of opening your vault to whoever finds the URL.
 
-Setting it up:
+The Deploy button flow has it built in: turn on **Protect with Cloudflare Access**, pick **All
+traffic** (previews only leaves the production hostname open), and add a policy with your email.
+One-time PIN works without an identity provider. For a CLI deploy the same switch is on the
+Worker's **Access** tab. It covers `workers.dev`, custom domains and preview URLs without listing
+them, and the Worker only checks that the `Cf-Access-Jwt-Assertion` header is present, which is
+exactly as good as what Access covers.
 
-1. Cloudflare dashboard → Zero Trust → Access controls → Applications → Add → **Self-hosted**.
-2. Pick the **Workers** destination and this Worker. That covers `*.workers.dev` and any custom
-   domain.
-3. Add a policy allowing your email. One-time PIN works without an identity provider.
-
-Two rules that are not preferences:
-
-- It has to be the **self-hosted** kind. A Worker-level Access policy rejects WebSocket upgrades with
-  a 403, and this chat is a WebSocket.
-- **Every hostname routed to this Worker has to be in the application**, preview URLs included. The
-  Worker only checks that the `Cf-Access-Jwt-Assertion` header is present, which is exactly as good
-  as the hostnames Access covers.
+The Workers docs say this kind of policy refuses WebSocket upgrades with `403`. Measured on
+2026-08-23 and 2026-09-05, it does not; this chat is a WebSocket and connects through it. If you
+meet the `403` anyway, a hostname-based application in Zero Trust works, with every hostname of
+this Worker listed in it.
 
 To run it open on purpose, set the var `ALLOW_UNPROTECTED=true`. It serves and logs
 `at: "access", stage: "unprotected"` on every request. The gate is off only when `ENVIRONMENT` is
@@ -72,8 +69,8 @@ pnpm wrangler secret put LLM_API_KEY                   # only with LLM_BASE_URL 
 pnpm run deploy         # `run` matters: bare `pnpm deploy` is pnpm's own command, not this script
 ```
 
-Either way, the first deploy opens on a page that says the agent is closed and lists the three
-Access steps above. Do them, reload, and the chat is there. What each secret is for is under
+A deploy with no Access in front opens on a page that says the agent is closed and points back
+here. Turn Access on, reload, and the chat is there. What each secret is for is under
 [Configuration](#configuration).
 
 ---
