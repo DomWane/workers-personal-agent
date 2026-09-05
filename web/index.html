@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Personal Agent</title>
+    <!-- Before first paint, so the theme does not flash. `useDark` stores 'auto' until the user
+         picks a side, and 'auto' means follow the system — not light. -->
+    <script>
+      const stored = localStorage.getItem('theme') || 'auto'
+      document.documentElement.classList.toggle(
+        'dark',
+        stored === 'dark' || (stored === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches),
+      )
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
