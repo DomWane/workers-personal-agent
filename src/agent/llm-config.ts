@@ -19,8 +19,9 @@ export function llmConfig(env: Env): LlmConfig {
   if (!env.LLM_BASE_URL) {
     return {
       baseUrl: `https://api.cloudflare.com/client/v4/accounts/${account}/ai/v1`,
-      // So a deployer configures nothing beyond the Cloudflare account and its token.
-      apiKey: env.LLM_API_KEY || env.CF_API_TOKEN,
+      // Never LLM_API_KEY here: a key left over from another provider is a 401 from Cloudflare
+      // with nothing in the log to say which credential was sent.
+      apiKey: env.CF_API_TOKEN,
       catalogueUrl: `https://api.cloudflare.com/client/v4/accounts/${account}/ai/models/search?task=Text%20Generation&per_page=100`,
       catalogue: 'cloudflare',
     }

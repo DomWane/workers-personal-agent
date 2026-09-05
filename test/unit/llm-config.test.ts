@@ -33,8 +33,9 @@ describe('llmConfig', () => {
     )
   })
 
-  it('falls back to CF_API_TOKEN for the key, and prefers LLM_API_KEY when both are set', () => {
+  it('authenticates the Cloudflare default with CF_API_TOKEN even when LLM_API_KEY is set', () => {
+    // A key left over from another provider must not reach Cloudflare: it answers 401 with no body.
     expect(llmConfig(makeEnv({})).apiKey).toBe('cf-token')
-    expect(llmConfig(makeEnv({ LLM_API_KEY: 'explicit' })).apiKey).toBe('explicit')
+    expect(llmConfig(makeEnv({ LLM_API_KEY: 'leftover' })).apiKey).toBe('cf-token')
   })
 })
