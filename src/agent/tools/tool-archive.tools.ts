@@ -44,7 +44,8 @@ export const readToolResultTool: ToolDef = defineTool({
   description:
     'Read a tool result that was shortened or came from an earlier turn, by the ref number quoted beside it. Costs no network request. Long results come back one window at a time; the reply says how to ask for the next.',
   params: z.object({
-    ref: z.number().int().describe('The ref number shown with the result'),
+    // Coerced: a model sent `"6"` for a ref it had just been shown as 6, and lost the call to it.
+    ref: z.coerce.number().int().describe('The ref number shown with the result'),
     from: z
       .number()
       .int()

@@ -952,6 +952,16 @@ describe('search_tool_results', () => {
     expect(out).toContain('at least one more match not shown')
   })
 
+  it('takes the ref as a string too, which is how a model once sent it', async () => {
+    // `{"ref": "6"}` for a ref it had just been shown as 6, and the call was refused. Mutation
+    // check: `z.number()` again and the parse below throws.
+    const record = { tool: 'read_page', args: '{"url":"https://x"}', content: 'A short page.', at: 1_700_000_000_000 }
+    const ctx = makeCtx({
+      toolArchive: { save: () => 1, read: (ref: number) => (ref === 7 ? record : null), search: () => [] },
+    } as never)
+    await expect(tools.read_tool_result.handler({ ref: '7', from: 0 }, ctx)).resolves.toContain('A short page.')
+  })
+
   it('says nothing was fetched rather than inventing a search', async () => {
     const out = await tools.search_tool_results.handler({ query: 'text' }, finding(0))
     expect(out).toContain('use web_search or read_page')
