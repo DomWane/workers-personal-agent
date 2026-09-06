@@ -20,6 +20,12 @@ export interface ToolArchive {
   search(query: string, limit: number): ToolResultMatch[]
 }
 
+/** The model asks for `…/playwright/` when the search returned `…/playwright`: on one real run
+ *  four of eight rate-limited fetches were slash or fragment variants of a page already held. */
+export function pageKey(url: string): string {
+  return url.replace(/#.*$/, '').replace(/\/+$/, '')
+}
+
 /** What tool handlers get. `agent` is the DO instance (loosely typed for testability). */
 export interface ToolContext {
   env: Env
@@ -54,6 +60,9 @@ export interface ToolContext {
    *  Separate from `onPageRead` because these cost no fetch and must not count as pages read; the
    *  query rides along because a search that returns nothing is only diagnosable with it. */
   onSearchResults?: (urls: string[], query: string) => void
+  /** Whole pages a search brought back beside its hits, keyed by `pageKey`, so that `read_page`
+   *  on one of them is a lookup rather than a fetch. Absent, every read pays a subrequest as before. */
+  pageCache?: Map<string, string>
   /** True for a page this run has already paid for, successfully or not. The prompt only shows a
    *  window of the visited list, so asking the model not to re-read is not what stops a charge. */
   alreadyTried?: (url: string) => boolean

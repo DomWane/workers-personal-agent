@@ -83,6 +83,27 @@ neither states precisely, so a deploy with no search secret still searches and a
 the ceiling. There is no scraper under them: DuckDuckGo's HTML endpoint sat at the bottom of the
 chain once and never returned a result from a Worker, answering 202 with a challenge page.
 
+**A search brings every hit back whole, and `read_page` on one of them is a lookup.** Tavily's
+`include_raw_content: "markdown"` returns each result's page in the same call and the same one
+subrequest; its [endpoint reference](https://docs.tavily.com/documentation/api-reference/endpoint/search)
+prices `search_depth` and lists no charge for the parameter. Probed keyless on 2026-09-06:
+
+```
+curl https://api.tavily.com/search -H 'x-tavily-access-mode: keyless' \
+  -d '{"query":"Cloudflare Workers subrequest limit free plan","max_results":5,"include_raw_content":"markdown"}'
+```
+
+Five results, `raw_content` of 1.8k, 19k, 26k, 3.3k and 3.2k characters, 1.5 s. The round keeps
+them for the invocation, and a chat turn for the turn; `read_page` checks that store before it
+fetches, and a hit is logged `via: search-cache`, counted as a read because the model saw the page,
+and charged nothing because nothing was requested. On the Free plan this is what lets a wave read
+at all: Browser Rendering allows one request every ten seconds per account and five scouts were
+losing half their reads to it (below). The pages are not put into the search result itself, because
+ten of them inline would overflow a 24k window that a 500-character snippet fits. Firecrawl's search
+can do the same with `scrapeOptions`, and [its docs](https://docs.firecrawl.dev/features/search)
+price it at 2 credits per ten results plus 1 per scraped page — 12 for a ten-result search where
+the model opens one or two — so the fallback vendor stays snippet-only.
+
 **`read_page` falls back to Firecrawl because of our own concurrency, not the site.** The fallback
 records `why`, and a run on 2026-09-03 settled it: 14 of 30 reads failed with Cloudflare's own
 `code: 2001, Rate limit exceeded`. `read_page` calls `/browser-rendering/markdown`, a **Quick

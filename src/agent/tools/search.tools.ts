@@ -3,7 +3,7 @@ import { firecrawlSearch } from '../../connectors/firecrawl.connector'
 import { tavilySearch, type SearchFilters, type SearchResult } from '../../connectors/tavily.connector'
 import type { Env } from '../../types'
 import { ORPHAN_LOG } from '../log'
-import { defineTool, type ToolDef } from './registry'
+import { defineTool, pageKey, type ToolDef } from './registry'
 import { rethrowIfExhausted } from '../subrequest-budget'
 
 /**
@@ -115,6 +115,13 @@ export const searchTools: ToolDef[] = [
         results.map((r) => r.url),
         query,
       )
+      let cached = 0
+      for (const r of results) {
+        if (r.raw && ctx.pageCache) {
+          ctx.pageCache.set(pageKey(r.url), r.raw)
+          cached++
+        }
+      }
       // Says what the search actually was, rather than leaving the model to infer it from its own
       // call: an empty result under a narrowing has to read as narrowed, not as the web being empty.
       const note = asked.length ? `(${asked.join(', ')})\n\n` : ''
@@ -122,7 +129,9 @@ export const searchTools: ToolDef[] = [
       if (results.length === 0) {
         return `${note}(no results)`
       }
-      return note + results.map((r, i) => `${i + 1}. ${r.title}\n${r.url}\n${r.description}`).join('\n\n')
+      // A fact about cost, so the model reads pages it would otherwise skip to save a request.
+      const footer = cached ? `\n\n(read_page returns ${cached} of these whole without a fetch)` : ''
+      return note + results.map((r, i) => `${i + 1}. ${r.title}\n${r.url}\n${r.description}`).join('\n\n') + footer
     },
   }),
 ]

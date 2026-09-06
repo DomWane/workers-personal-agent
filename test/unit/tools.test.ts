@@ -5,7 +5,7 @@ import { ARCHIVE_MIN_CHARS } from '../../src/agent/tool-loop'
 import { buildTools } from '../../src/agent/tools'
 import { MAX_PAGE_CHARS } from '../../src/agent/tools/browser.tools'
 import type { CitationVerdict } from '../../src/agent/provenance'
-import { DEFAULT_RESULT_CHARS, type ScheduleInfo, type ToolContext } from '../../src/agent/tools/registry'
+import { DEFAULT_RESULT_CHARS, pageKey, type ScheduleInfo, type ToolContext } from '../../src/agent/tools/registry'
 import { MAX_SCHEDULED_TASKS } from '../../src/agent/tools/schedule.tools'
 import type { Env } from '../../src/types'
 import { readVault, seedVault } from '../helpers/vault'
@@ -113,6 +113,26 @@ describe('web_search tool', () => {
     tavilyReply({ results: [{ title: 'T', url: 'https://t.example/', content: 'D' }] })
     const out = await tools.web_search.handler({ query: 'x' }, withTavily())
     expect(out).toBe('1. T\nhttps://t.example/\nD')
+  })
+
+  it('hands a page that came with a hit to the round, and says so under the results', async () => {
+    tavilyReply({
+      results: [
+        { title: 'T', url: 'https://t.example/', content: 'D', raw_content: '# Whole page' },
+        { title: 'U', url: 'https://u.example/', content: 'E' },
+      ],
+    })
+    // Mutation check: drop the `set` and the cache stays empty, so every read pays a fetch again.
+    const pageCache = new Map<string, string>()
+    const ctx = makeCtx({ env: { FIRECRAWL_API_KEY: 'test-fc-key', TAVILY_API_KEY: 'tvly-key' } as never, pageCache })
+
+    const out = await tools.web_search.handler({ query: 'x' }, ctx)
+
+    expect([...pageCache]).toEqual([['https://t.example', '# Whole page']])
+    // The list itself is unchanged: ten whole pages inline would overflow a 24k window.
+    expect(out).toBe(
+      '1. T\nhttps://t.example/\nD\n\n2. U\nhttps://u.example/\nE\n\n(read_page returns 1 of these whole without a fetch)',
+    )
   })
 
   it('returns the whole result list and declares its cap, rather than cutting it itself', async () => {
@@ -317,6 +337,43 @@ describe('read_page records which provider served it', () => {
 })
 
 describe('read_page tool', () => {
+  it('finds the cached page under a trailing slash or a fragment, which is how the model asks', async () => {
+    // Four of eight rate-limited fetches on one real run were `…/playwright/` for a cached
+    // `…/playwright`. Mutation check: key by the raw URL and this fetches, which fails here.
+    const ctx = makeCtx({
+      pageCache: new Map([
+        [
+          pageKey('https://example.com/docs/'),
+          '# Docs\n\nA long enough article body to count as prose for the extractor to keep.',
+        ],
+      ]),
+    })
+    await expect(tools.read_page.handler({ url: 'https://example.com/docs#top' }, ctx)).resolves.toContain(
+      'A long enough',
+    )
+  })
+
+  it('serves a page a search already brought back, without a fetch', async () => {
+    // No interceptor at all: a fetch here fails under disableNetConnect. Mutation check: drop the
+    // `pageCache` lookup and the read pays Browser Rendering for a page it already had.
+    const reads: [string, boolean][] = []
+    const ctx = makeCtx({
+      pageCache: new Map([
+        [
+          'https://example.com',
+          '# Whole page\n\nA long enough article body to count as prose for the extractor to keep.',
+        ],
+      ]),
+      onPageRead: (url, ok) => reads.push([url, ok]),
+    })
+
+    await expect(tools.read_page.handler({ url: 'https://example.com' }, ctx)).resolves.toContain(
+      'A long enough article',
+    )
+    // Counted as a read: the model saw the page, and the report counts pages seen.
+    expect(reads).toEqual([['https://example.com', true]])
+  })
+
   it('returns page markdown via browser run', async () => {
     fetchMock
       .get('https://api.cloudflare.com')

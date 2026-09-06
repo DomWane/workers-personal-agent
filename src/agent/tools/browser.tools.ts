@@ -3,7 +3,7 @@ import { fetchPageMarkdown } from '../../connectors/browser-run.connector'
 import { firecrawlScrape } from '../../connectors/firecrawl.connector'
 import { ORPHAN_LOG, type TurnLog } from '../log'
 import { extractMain } from './page-text'
-import { defineTool, type ToolDef } from './registry'
+import { defineTool, pageKey, type ToolDef } from './registry'
 import { rethrowIfExhausted } from '../subrequest-budget'
 
 /**
@@ -49,6 +49,14 @@ export const browserTools: ToolDef[] = [
       if (ctx.alreadyTried?.(url)) {
         log.event({ at: 'read_page', stage: 'already-tried' })
         return 'error: this run already fetched this URL — read something else'
+      }
+      // Counted as a read because the model sees the page; spent nothing because nothing was requested.
+      const cached = ctx.pageCache?.get(pageKey(url))
+      if (cached) {
+        const markdown = extractMain(cached)
+        logRead(log, 'search-cache', false, markdown.length)
+        ctx.onPageRead?.(url, true)
+        return markdown
       }
       try {
         const markdown = extractMain(

@@ -63,6 +63,23 @@ describe('tavilySearch', () => {
     expect(out[0].description).toHaveLength(500)
   })
 
+  it('asks for the whole page with every hit, and hands it on as raw', async () => {
+    // Same one credit and one subrequest as the bare search (probed keyless 2026-09-06). Mutation
+    // check: drop `include_raw_content` and `raw` is never filled, so every read_page pays again.
+    const seen = reply({
+      results: [
+        { title: 'T', url: 'https://a.example', content: 'snippet', raw_content: '# Whole page' },
+        { title: 'U', url: 'https://b.example', content: 'snippet', raw_content: null },
+      ],
+    })
+
+    const out = await tavilySearch('k', 'q')
+
+    expect(seen.sent).toMatchObject({ include_raw_content: 'markdown' })
+    expect(out[0].raw).toBe('# Whole page')
+    expect(out[1]).not.toHaveProperty('raw')
+  })
+
   it('passes the filters the model asked for, in the vendor spelling', async () => {
     const seen = reply({ results: [{ title: 'T', url: 'https://a.example', content: 'c' }] })
 
