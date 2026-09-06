@@ -4,19 +4,11 @@ import { defineTool, type ToolDef } from './registry'
 
 const CRON_RE = /^[\d*/,-]+ [\d*/,-]+ [\d*/,-]+ [\d*/,-]+ [\d*/,-]+$/
 
-// A recurring task is a whole tool loop, so hourly at most: the minute field has to be one number,
-// which refuses every-minute and every-five-minutes crons before a page the model read can plant one.
 const HOURLY_AT_MOST = /^\d{1,2} /
-// Each task is a tool loop with its own budget; the cap keeps a runaway model from filling the
-// calendar with them.
 export const MAX_SCHEDULED_TASKS = 20
 
-/** A tool result, not a throw: a model that reaches these in a context without a scheduler needs
- *  an answer it can act on, and an unmatched tool_call id makes the next request a 400. */
 const NO_SCHEDULER = 'error: nothing can be scheduled from here'
 
-/** Transforms rather than checks: `Agent.schedule` overloads on cron-string against `Date`, so the
- *  handlers want the parsed value and would otherwise each re-parse it. */
 const WHEN = z
   .string()
   .describe('ISO datetime (2026-07-07T09:00:00Z) for one-time, or 5-field cron (0 8 * * *) for recurring')

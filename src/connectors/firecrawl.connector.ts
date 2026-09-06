@@ -8,7 +8,6 @@ export interface FirecrawlSearchResult {
   description: string
 }
 
-/** Firecrawl spells a time range as Google's `tbs`, so the shared field has to be mapped. */
 const TBS: Record<NonNullable<SearchFilters['timeRange']>, string> = {
   day: 'qdr:d',
   week: 'qdr:w',
@@ -16,8 +15,6 @@ const TBS: Record<NonNullable<SearchFilters['timeRange']>, string> = {
   year: 'qdr:y',
 }
 
-/** Firecrawl is keyless since 2026-06-16: a request with no `Authorization` draws on a free monthly
- *  allowance the launch post puts at 1,000 credits, and a key is only what raises it. */
 function headers(apiKey: string | undefined): Record<string, string> {
   return { 'content-type': 'application/json', ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}) }
 }

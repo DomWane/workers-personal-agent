@@ -1,14 +1,7 @@
 import OpenAI from 'openai'
 import type { ChatMessage, ToolCall } from '../types'
 
-/**
- * The provider is reached through its OpenAI-compatible endpoint, so we point the
- * `openai` client at a configured base URL. Keeping this behind a tiny connector
- * means swapping providers is a config change, not a code change.
- */
 export function createLlmClient(apiKey: string, baseURL: string, doFetch?: typeof globalThis.fetch): OpenAI {
-  // maxRetries: 0 — the SDK retries timeouts by default, which multiplies wait time
-  // on an already-slow model. We handle failures ourselves and fail fast.
   return new OpenAI({ apiKey, baseURL, maxRetries: 0, ...(doFetch ? { fetch: doFetch } : {}) })
 }
 
@@ -17,11 +10,6 @@ export interface ChatOptions {
   timeoutMs?: number
 }
 
-/**
- * Deliberately sends only standard OpenAI fields. An earlier version added NVIDIA's
- * chat_template_kwargs for glm/nemotron families; routed through OpenRouter that reaches
- * arbitrary upstreams, some of which mishandle or reject the unknown parameter.
- */
 function buildBody(
   model: string,
   messages: ChatMessage[],
@@ -39,10 +27,6 @@ function buildBody(
   }
 }
 
-/**
- * Single non-streaming chat completion. Returns the assistant's final text.
- * Reasoning content (if any) is intentionally discarded — never surfaced.
- */
 export async function chatCompletion(
   client: OpenAI,
   model: string,
@@ -59,20 +43,16 @@ export async function chatCompletion(
   return (completion as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content?.trim() ?? ''
 }
 
-/** Token counts as the provider reported them. Absent when the upstream omits `usage`. */
 export interface CompletionUsage {
   inputTokens?: number
   outputTokens?: number
-  /** Billed as output but not present in the content, so it has to be counted separately. */
   reasoningTokens?: number
 }
 
 export interface CompletionResult {
   content: string
   toolCalls: ToolCall[]
-  /** Diagnostics only — never used for control flow. */
   finishReason?: string
-  /** OpenRouter routes the same model to different upstreams per request; behaviour varies by upstream. */
   provider?: string
   usage?: CompletionUsage
 }
@@ -104,8 +84,6 @@ export async function chatCompletionWithTools(
     toolCalls: choice?.message?.tool_calls ?? [],
     finishReason: choice?.finish_reason,
     provider: raw.provider,
-    // Omitted entirely rather than zero-filled: a provider that reports no usage and one that
-    // genuinely spent nothing must not average together into the same cost figure.
     ...(usage
       ? {
           usage: {

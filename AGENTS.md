@@ -137,8 +137,8 @@ no unit test could have failed, because that is its argument for existing.
 
 ## Style
 
-Comments explain a constraint or a trade-off that the code cannot state; the surviving comments in
-`vitest.config.ts` and `embedding-index.ts` are the model. Default to none.
+Behaviour goes in a test with a descriptive name, ameasurement in `ARCHITECTURE.md`, 
+a rejected alternative in `docs/decisions/`.
 
 ## Working with me here
 

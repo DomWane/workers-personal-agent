@@ -19,9 +19,6 @@ export const profileTools: ToolDef[] = [
       }),
     }),
     handler: async (args, ctx) => {
-      // The profile is the one memory that costs tokens on every turn, so the nightly pass is told
-      // to consolidate it — which is exactly where an unaided "newest wins" would quietly delete a
-      // fact that held for a year. Appending is free; overwriting and removing are not.
       if (args.op !== 'add') {
         const checked = await checkGrounds(args, ctx)
         if (!checked.ok) {

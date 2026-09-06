@@ -32,21 +32,14 @@ function collapseNewlines(s: string): string {
   return s.replace(/\s*\n\s*/g, ' ')
 }
 
-/** Every model-supplied frontmatter value goes through this: the parser reads one `key: value` a
- *  line, so a newline from the model would end the block early and orphan the rest of the keys. */
 function fmValue(s: string): string {
   return sanitize(collapseNewlines(s))
 }
 
-/**
- * Strips invisible/control Unicode (keeps \n and \t) so nothing unreadable can
- * ride into the vault — the write-side half of the memory-poisoning defence.
- */
 export function sanitize(s: string): string {
   return s.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '')
 }
 
-/** The four operations the store needs. Both vault connectors satisfy it structurally. */
 export interface VaultBackend {
   getFile(path: string): Promise<{ content: string; sha: string } | null>
   putFile(path: string, content: string, message: string, sha?: string): Promise<void>
@@ -90,18 +83,10 @@ export class VaultStore implements MemoryStore {
     return this.today ?? new Date().toISOString().slice(0, 10)
   }
 
-  /**
-   * A Durable Object namespace cannot be enumerated, so this file is the only way back to a thread
-   * whose id nobody remembers. It has two readers — the client, to draw the list, and the nightly
-   * maintenance run, to know whom to ask — which is why an unparseable file throws instead of
-   * reading as "no threads": empty would mean the night reflected over nothing, silently.
-   */
   async listThreads(): Promise<Thread[]> {
     return this.readThreads().then((r) => r.threads)
   }
 
-  /** The etag comes back with the rows because both writers need it, and fetching the object a
-   *  second time to get it is a wasted read. */
   private async readThreads(): Promise<{ threads: Thread[]; sha?: string }> {
     const file = await this.vault.getFile(this.threadsPath())
     if (!file) {
@@ -119,8 +104,6 @@ export class VaultStore implements MemoryStore {
     return { threads: parsed as Thread[], sha: file.sha }
   }
 
-  /** The title is only ever set, never overwritten by a later derivation: a name the user typed
-   *  outranks one the first message produced. */
   async touchThread(id: string, title?: string): Promise<void> {
     const { threads, sha } = await this.readThreads()
     const existing = threads.find((t) => t.id === id)
@@ -136,8 +119,6 @@ export class VaultStore implements MemoryStore {
     await this.vault.putFile(this.threadsPath(), `${JSON.stringify(threads, null, 2)}\n`, `threads: ${id}`, sha)
   }
 
-  /** The one way a title is overwritten. `touchThread` refuses to, so that a later derivation
-   *  cannot undo a name the user typed; this is the deliberate act that outranks it. */
   async renameThread(id: string, title: string): Promise<void> {
     const { threads, sha } = await this.readThreads()
     const existing = threads.find((t) => t.id === id)
@@ -159,7 +140,6 @@ export class VaultStore implements MemoryStore {
   }
 
   async save(entry: MemoryEntry & { source: MemorySource }): Promise<string> {
-    // `|| 'untitled'` because an all-punctuation name slugifies to the empty string.
     const name = fmValue(entry.name)
     const description = fmValue(entry.description)
     const slug = slugify(name) || 'untitled'
@@ -185,7 +165,6 @@ export class VaultStore implements MemoryStore {
     if (i >= 0) {
       lines[i] = line
     } else {
-      // Blank line after the header, on the first memory only.
       if (lines.length === 1) {
         lines.push('')
       }
@@ -195,20 +174,11 @@ export class VaultStore implements MemoryStore {
     return existing ? `updated memory "${slug}"` : `saved memory "${slug}"`
   }
 
-  /**
-   * Keyword recall, and what `search_memory` falls back to when the embedding index is unavailable.
-   * The two halves are searched independently, so an absent MEMORY.md still finds sessions.
-   *
-   * There is deliberately no third half for `research/`: reports are reachable semantically only.
-   * That is why a report saved in one thread can be invisible in another until a reindex has run.
-   */
   async search(query: string): Promise<MemoryEntry[]> {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
     return [...(await this.searchMemories(words)), ...(await this.searchSessions(words))]
   }
 
-  /** Matches MEMORY.md's one-line descriptions, not the memories themselves — the bodies are only
-   *  read for the handful that match, since each read is a separate R2 object. */
   private async searchMemories(words: string[]): Promise<MemoryEntry[]> {
     const index = await this.vault.getFile(this.indexPath())
     const matches = parseIndexLines(index?.content ?? '')
@@ -225,8 +195,6 @@ export class VaultStore implements MemoryStore {
     return entries
   }
 
-  /** Matches the file name only, so a session whose subject never appears in its name is
-   *  unreachable this way and only the embedding index finds it. */
   private async searchSessions(words: string[]): Promise<MemoryEntry[]> {
     try {
       const sessions = await this.vault.listDir(`${this.dir}/sessions`)
@@ -250,7 +218,6 @@ export class VaultStore implements MemoryStore {
       }
       return entries
     } catch (err) {
-      // A session-listing hiccup must not sink memory recall.
       console.error('[vault-store] session search failed', err)
       return []
     }
@@ -261,11 +228,6 @@ export class VaultStore implements MemoryStore {
     return index?.content ?? '(no memories saved yet)'
   }
 
-  /**
-   * A finished research run, kept as its own file. Sessions and memories are things the agent
-   * rewrites; a report is not — a second run on the same topic is another run, so the slug carries
-   * a counter rather than taking the first one's place.
-   */
   async saveResearch(topic: string, report: string): Promise<string> {
     const clean = fmValue(topic)
     const base = `${this.todayStr()}-${slugify(clean) || 'research'}`
@@ -300,8 +262,6 @@ export class VaultStore implements MemoryStore {
     if (op === 'add') {
       next = current ? `${current}\n${t}` : t
     } else {
-      // The caller works from a copy frozen at session start, so its idea of the text goes stale
-      // after the first edit. Returning the live content lets it retry within the same turn.
       if (!current.includes(t)) {
         return `error: text not found: "${t.slice(0, 80)}"\ncurrent content:\n${current}`
       }
@@ -316,7 +276,6 @@ export class VaultStore implements MemoryStore {
         .trim()
     }
 
-    // The cap is the curation mechanism: refusing the write forces consolidation.
     if (next.length > max) {
       return `error: profile would be ${next.length}/${max} chars — consolidate first: replace or remove less important lines, move details to save_memory`
     }
@@ -347,7 +306,6 @@ export class VaultStore implements MemoryStore {
     const fm: Record<string, string> = {
       name,
       description,
-      // counters and pin survive model rewrites — they belong to usage, not content
       date: prev?.date ?? this.todayStr(),
       use_count: prev?.use_count ?? '0',
     }
@@ -371,8 +329,6 @@ export class VaultStore implements MemoryStore {
     const entries = await this.vault.listDir(`${this.dir}/skills`)
     const all = entries.filter((e) => e.name.endsWith('.md'))
     const mdFiles = all.slice(0, MAX_SKILLS)
-    // Silent truncation here would hide skills from the reflection that curates them, so the
-    // 31st skill could never be archived and nobody would learn why.
     if (all.length > mdFiles.length) {
       console.log(JSON.stringify({ at: 'vault', stage: 'skills-truncated', total: all.length, listed: mdFiles.length }))
     }
@@ -402,7 +358,6 @@ export class VaultStore implements MemoryStore {
     const { fm, body } = parseFrontmatter(f.content)
     const meta = toSkillMeta(slug, fm)
     try {
-      // Usage stamping is reflection telemetry — never fail the read over it.
       const stamped = { ...fm, use_count: String(meta.useCount + 1), last_used: this.todayStr() }
       await this.vault.putFile(this.skillPath(slug), renderSkillFile(stamped, body), `skill use: ${slug}`, f.sha)
     } catch (err) {
@@ -423,7 +378,6 @@ export class VaultStore implements MemoryStore {
     return `archived skill "${slug}"`
   }
 
-  /** Slug of a memory that actually exists, or the canonical slug if none does. */
   async resolveMemorySlug(name: string): Promise<string> {
     const candidates = slugCandidates(name)
     for (const slug of candidates) {
@@ -441,8 +395,6 @@ export class VaultStore implements MemoryStore {
     }
     const archivePath = `${this.dir}/memory/archive/${slug}.md`
     const existing = await this.vault.getFile(archivePath)
-    // The evidence is filed with the memory, not left in a log that expires in three days: a
-    // destroyed fact whose reason cannot be found afterwards is indistinguishable from a whim.
     const content = grounds ? withArchiveGrounds(f.content, grounds) : f.content
     await this.vault.putFile(archivePath, content, `archive memory: ${slug}`, existing?.sha)
     await this.vault.deleteFile(this.memPath(slug), `archive memory: ${slug}`, f.sha)
@@ -461,8 +413,6 @@ export class VaultStore implements MemoryStore {
   }
 
   async readEntry(kind: IndexedKind, slug: string): Promise<MemoryEntry | null> {
-    // A memory carries its own name and description in frontmatter; the other two are plain files,
-    // so the slug is the only name they have and the description is a label for the kind.
     if (kind === 'memory') {
       const f = await this.vault.getFile(this.memPath(slug))
       return f ? parseMemoryFile(f.content) : null
@@ -476,12 +426,6 @@ export class VaultStore implements MemoryStore {
     return { name: slug, description, content: f.content.trim().slice(0, MAX_CONTENT_CHARS) }
   }
 
-  /**
-   * Lists rather than reads: three requests describe the whole indexable vault, and the
-   * blob sha tells the caller which files actually changed. Folders are the source of
-   * truth here rather than MEMORY.md, so a note written into the bucket by hand is indexed
-   * too; archived entries live in a subfolder and listDir returns files only.
-   */
   async indexManifest(): Promise<Array<{ kind: IndexedKind; slug: string; sha: string }>> {
     const [memories, sessions, research] = await Promise.all([
       this.vault.listDir(`${this.dir}/memory`),
@@ -502,8 +446,6 @@ function withArchiveGrounds(raw: string, grounds: MemorySource): string {
   return raw.replace(/^---\n/, `---\n${added.join('\n')}\n`)
 }
 
-// Takes no `doFetch`, unlike every other connector factory: R2 goes through a binding and is not
-// charged against the external cap, so there is nothing here for the subrequest budget to count.
 export function createMemoryStore(env: Env): MemoryStore {
   return new VaultStore(new R2VaultConnector(env.VAULT), env.VAULT_AGENT_DIR)
 }

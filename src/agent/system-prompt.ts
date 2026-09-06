@@ -26,8 +26,6 @@ Guidelines:
 - For a workflow-shaped task (multi-step, done before), check list_skills and read_skill the match before improvising.
 - After completing a novel workflow that took 5+ tool calls, recovered from an error, or surfaced a non-obvious pattern, offer to save_skill it (When to Use / Procedure / Pitfalls / Verification).`
 
-/** The profile rides along every turn rather than waiting for `search_memory`: nothing can search
- *  for context it does not know is missing, and standing facts never announce their absence. */
 export function buildSystemPrompt(userProfile: string, agentNotes: string, historySummary?: string): string {
   const earlier = historySummary?.trim()
     ? `
