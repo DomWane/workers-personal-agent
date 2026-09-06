@@ -1,4 +1,4 @@
-# Personal Agent — a web chat agent on Cloudflare Workers
+# Personal Agent: a web chat agent on Cloudflare Workers
 
 [![CI](https://github.com/DomWane/workers-personal-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/DomWane/workers-personal-agent/actions/workflows/ci.yml)
 
@@ -14,7 +14,7 @@ measured and written down.
 **What you need**
 
 - A Cloudflare account. The free plan is enough.
-- Cloudflare Access in front of the Worker — free, two minutes, [explained below](#before-you-deploy-cloudflare-access).
+- Cloudflare Access in front of the Worker. Free, two minutes, [explained below](#before-you-deploy-cloudflare-access).
 - A model. The committed config uses Workers AI (`@cf/zai-org/glm-4.7-flash`, 131k context), so
   there is nothing else to set up. Any OpenAI-compatible endpoint is one var and one secret away.
 
@@ -29,7 +29,7 @@ API, zod, Vue 3 + Vite + Tailwind + shadcn-vue, pnpm, wrangler v4, vitest, oxlin
 
 A connected client receives the whole broadcast state: the conversation, the user profile, the
 agent's notes, finished research reports. That is fine for one user, which is what this is built for.
-It also means the Worker **refuses to serve until Cloudflare Access is in front of it** — a fresh
+It also means the Worker **refuses to serve until Cloudflare Access is in front of it**: a fresh
 deploy answers `503` with instructions instead of opening your vault to whoever finds the URL.
 
 The Deploy button flow has it built in: turn on **Protect with Cloudflare Access**, pick **All
@@ -85,7 +85,7 @@ pnpm dev                              # wrangler dev on http://localhost:8787, b
 ```
 
 Open `http://localhost:8787`. `pnpm dev:web` runs Vite separately with hot reload, proxying
-`/agents` and `/api` to the Worker on 8787 — useful while working on the UI.
+`/agents` and `/api` to the Worker on 8787, which is useful while working on the UI.
 
 `ENVIRONMENT=localhost` also opens two dev-only routes:
 
@@ -101,7 +101,7 @@ node scripts/seed-web-chat.mjs --phase done      # or: proposed, running
 binding has no local simulator, so dev opens a remote proxy session against the deployed Worker, and
 Access gates it. Install `cloudflared` once and let wrangler send you to the Access login. Do not
 pipe dev through `tee`: that makes it non-interactive, and the failure then complains about missing
-service-token credentials rather than about the missing terminal.
+service-token credentials instead of the missing terminal.
 
 ### Checks and tests
 
@@ -117,7 +117,7 @@ pnpm format       # oxfmt; format:check is the read-only form
 
 Tests use miniflare bindings and need no network: R2 is simulated locally, outbound HTTP is
 intercepted. `pnpm lint` runs typescript-eslint's type-aware rules through `oxlint-tsgolint` on
-TypeScript 5.9, although the oxc docs say 7 — the comparison, and why 7 is blocked by `vue-tsc`, is in
+TypeScript 5.9, although the oxc docs say 7. The comparison, and why 7 is blocked by `vue-tsc`, is in
 [docs/decisions/linting-and-formatting.md](docs/decisions/linting-and-formatting.md).
 
 ---
@@ -131,11 +131,11 @@ The agent talks to any OpenAI-compatible API. One variable decides which:
 | `LLM_BASE_URL` | What happens |
 | :--- | :--- |
 | unset | **Cloudflare Workers AI**, derived from `CF_ACCOUNT_ID`, authenticated with `CF_API_TOKEN`. Nothing else to configure. |
-| set | That endpoint, authenticated with `LLM_API_KEY`. OpenRouter, OpenAI, Together, Groq, a local Ollama — anything speaking the OpenAI shape. |
+| set | That endpoint, authenticated with `LLM_API_KEY`. OpenRouter, OpenAI, Together, Groq, a local Ollama, anything speaking the OpenAI shape. |
 
 The model picker in the UI reads the provider's own catalogue and shows, per model, price per
 million tokens, context window, and whether it supports tool calling. Models the deployment cannot
-call are listed greyed out rather than hidden.
+call are still listed, greyed out.
 
 **Tool calling is not optional.** The agent is a tool loop; a model without it cannot search, read,
 or remember. Four Workers AI models were verified to return proper `tool_calls` on the Free plan:
@@ -223,23 +223,23 @@ than assumed.
 **Long-term memory.** Markdown in R2, with semantic recall over an embedding index in DO SQLite and
 a keyword path as fallback. The index is derived data keyed by the R2 etag, so an unchanged vault
 reconciles at zero cost. Every memory records the thread and turn it came from, and the two writes
-that destroy something — archiving a memory, rewriting a profile line — need a cited user turn that
+that destroy something (archiving a memory, rewriting a profile line) need a cited user turn that
 is checked against the conversation holding it.
 
 **History that compacts instead of truncating.** At 80% of the *selected model's* context window an
 alarm folds the oldest turns into a rolling summary, keeping a verbatim tail of 25%. A message count
 cannot express that threshold when the picker switches between a 24k and a 131k model
 mid-conversation. What compaction evicts goes into an append-only archive in the thread's own SQLite
-first, so it is shadowed rather than lost.
+first, so compaction shadows a turn instead of losing it.
 
 **Tool results that outlive their round.** A fetched page is kept whole in the thread's SQLite and
 only the copy inside the request is cut, so `read_tool_result` reaches the rest and
 `search_tool_results` finds it a dozen turns later. How much survives into the request is a fraction
-of the model's own window, not a fixed number.
+of the model's own window, so it changes with the model.
 
 **Scheduled work.** Reminders, recurring agentic tasks, a nightly reflection pass that curates
-memory, and index reconciliation — all Durable Object alarms, never inside a chat turn. An unbounded
-sweep inside a turn is what caused this project's one outage.
+memory, and index reconciliation: all of them Durable Object alarms, none inside a chat turn. An
+unbounded sweep inside a turn is what caused this project's one outage.
 
 **Several conversations.** One Durable Object per thread, listed in a sidebar and registered in the
 vault rather than in `localStorage`, because a cleared browser store would otherwise leave threads
@@ -261,10 +261,10 @@ measured, is in [ARCHITECTURE.md](ARCHITECTURE.md).
 | Limit | Free plan | When it bites | What the agent does | What lifts it |
 | :--- | :--- | :--- | :--- | :--- |
 | External subrequests per invocation | 50 | a chat turn with many tool calls; a research round | counts every call against a budget and stops the loop before the 51st, saying so | Workers Paid: 10,000 |
-| Browser Rendering (`read_page`) | 1 request / 10 s, 10 min of browser time a day | a research wave — a single round outruns it | falls back to Firecrawl and logs `why`; the report counts pages it could not open | Workers Paid |
+| Browser Rendering (`read_page`) | 1 request / 10 s, 10 min of browser time a day | a research wave; a single round outruns it | falls back to Firecrawl and logs `why`; the report counts pages it could not open | Workers Paid |
 | Workers AI | 10,000 neurons a day | a deep research run on the default model | the provider answers 429 and the turn is reported as failed | Workers Paid, or `LLM_BASE_URL` pointed elsewhere |
 | Web search without a key | Tavily: rate-limited, number unpublished · Firecrawl: 1,000 credits a month | a research run on a deploy with no search secret | a refused search is reported as a tool fault, never as an empty web | `TAVILY_API_KEY`: 100 requests a minute · `FIRECRAWL_API_KEY`: 10 a minute |
-| Durable Object CPU | 30 s per request | far beyond anything here; brute-force cosine over the vault is milliseconds | — | — |
+| Durable Object CPU | 30 s per request | far beyond anything here; brute-force cosine over the vault is milliseconds | nothing needed | not needed |
 
 A chat turn never meets any of these. Deep research meets the first three on every run and is built
 to finish anyway: on the run in [the walkthrough](docs/manual-e2e.md) it lost 14 of 30 page reads to
@@ -276,13 +276,13 @@ the Browser Rendering limit, completed, and said so in the report.
 
 The measurements. Two write-ups, each settling a question with data, and one walkthrough:
 
-- **[Choosing a retriever by measuring it](docs/retrieval-eval.md)** — 673 real exchanges, graded
+- **[Choosing a retriever by measuring it](docs/retrieval-eval.md):** 673 real exchanges, graded
   relevance, pooled judgments. Dense retrieval (`bge-m3`) beats BM25 by **+0.200 nDCG@10
   [0.070, 0.326]**. Hybrid fusion and a cross-encoder reranker were both tested and rejected.
-- **[Does ThinkingCap's token saving hold in Czech, over real work?](docs/thinkingcap-replication.md)**
-  — an independent replication off the benchmark suite the claim was made on. The saving holds at
+- **[Does ThinkingCap's token saving hold in Czech, over real work?](docs/thinkingcap-replication.md):**
+  an independent replication off the benchmark suite the claim was made on. The saving holds at
   **50.8% [43.2%, 57.7%]**; the capability half is underpowered, and the write-up says so.
-- **[The walkthrough for the seams no suite covers](docs/manual-e2e.md)** — the DOM, and the socket
+- **[The walkthrough for the seams no suite covers](docs/manual-e2e.md):** the DOM, and the socket
   between the built client and a live Worker. It opens with the three bugs found by hand that no
   unit test could have failed.
 
@@ -292,7 +292,7 @@ hybrid fusion, a reranker, a larger ingest window and averaged word vectors were
 rejected, two against a prediction written down beforehand. The negative results are kept in full.
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md) carries the same habit for the platform: every number in its
-tables says how it is known — measured, with the date, or documented. [`docs/decisions/`](docs/decisions/)
+tables says how it is known: measured, with the date, or documented. [`docs/decisions/`](docs/decisions/)
 holds the rejected alternative behind each subsystem. `AGENTS.md` is the working file for the coding
 agent this was built with; the architecture was split out of it so a person and an agent can each
 read their half.
@@ -315,7 +315,7 @@ refused with "your IP address looks suspicious". The deployed Worker calls from 
 which was accepted when checked. A `FIRECRAWL_API_KEY` in `.env` lifts it locally.
 
 **A deploy seems to have had no effect.** A live Durable Object keeps running its old code until the
-instance restarts — about five minutes, measured once. Wait before doubting the change.
+instance restarts, about five minutes when measured once. Wait before doubting the change.
 
 **A route answers with HTML instead of JSON.** The path is missing from `run_worker_first`, so the
 asset server served the SPA shell and the Worker never saw it.
@@ -326,34 +326,34 @@ asset server served the SPA shell and the Worker never saw it.
 
 Designs borrowed, with what was taken from each:
 
-- **[deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)** — the compaction
+- **[deepseek-harness](https://github.com/deepseek-ai/deepseek-harness):** the compaction
   threshold (`dsh-compaction-basic`'s 0.80), writing the archive record before the trim, and the
   start/end rows that make an abandoned compaction detectable.
-- **[hermes-agent](https://github.com/NousResearch/hermes-agent)** — dropping half-paired tool
+- **[hermes-agent](https://github.com/NousResearch/hermes-agent):** dropping half-paired tool
   traffic before it reaches a strict provider.
-- **[openclaw](https://docs.openclaw.ai)** and **[gemini-cli](https://github.com/google-gemini/gemini-cli)**
-  — the two harnesses whose tool-result caps were compared against `RESULT_SHARE_OF_WINDOW` before
+- **[openclaw](https://docs.openclaw.ai)** and **[gemini-cli](https://github.com/google-gemini/gemini-cli):**
+  the two harnesses whose tool-result caps were compared against `RESULT_SHARE_OF_WINDOW` before
   it was kept.
-- **[Static-DRA](https://arxiv.org/abs/2512.03887)** — the `max(b - 2i, 1)` narrowing of a
+- **[Static-DRA](https://arxiv.org/abs/2512.03887):** the `max(b - 2i, 1)` narrowing of a
   research wave.
 
 No code was copied from any of them.
 
 Papers, with the decision each one carries:
 
-- **Lindenbauer et al., [arXiv 2508.21433](https://arxiv.org/abs/2508.21433)** — replacing stale
+- **Lindenbauer et al., [arXiv 2508.21433](https://arxiv.org/abs/2508.21433):** replacing stale
   observations with a placeholder halves an agent's cost at the same solve rate; why the pruner
   stubs a result the model has already answered on.
-- **Zhang et al., [arXiv 2606.00408](https://arxiv.org/abs/2606.00408)** — an append-only page pool
+- **Zhang et al., [arXiv 2606.00408](https://arxiv.org/abs/2606.00408):** an append-only page pool
   the model can re-open, and attention on observations front-loaded; why every cut keeps a head, a
   tail and a ref back.
-- **Huang et al., ICLR 2024, [arXiv 2310.01798](https://arxiv.org/abs/2310.01798)** — unaided
+- **Huang et al., ICLR 2024, [arXiv 2310.01798](https://arxiv.org/abs/2310.01798):** unaided
   self-correction makes reasoning worse; why a memory write that destroys something needs a cited
   user turn.
-- **DeepHalluBench, [arXiv 2601.22984](https://arxiv.org/abs/2601.22984)** — an invented source is
+- **DeepHalluBench, [arXiv 2601.22984](https://arxiv.org/abs/2601.22984):** an invented source is
   invisible to end-to-end evaluation; why ungrounded citations are logged rather than trusted.
 - **NoLiMa, [arXiv 2502.05167](https://arxiv.org/abs/2502.05167)** and **LineRetriever,
-  [arXiv 2507.00210](https://arxiv.org/abs/2507.00210)** — how far a model's usable context falls
+  [arXiv 2507.00210](https://arxiv.org/abs/2507.00210):** how far a model's usable context falls
   short of its window; the ground for the page-size preregistration in `evals/results/`.
 
 Each is discussed where it is used, in [docs/decisions/](docs/decisions/) and
@@ -361,7 +361,7 @@ Each is discussed where it is used, in [docs/decisions/](docs/decisions/) and
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
 
 `web/src/components/` holds source copied from shadcn-vue (MIT) and ai-elements-vue (Apache-2.0),
 both copy-paste registries whose CLI writes into the project rather than into `node_modules`. Those
