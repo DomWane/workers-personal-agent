@@ -16,7 +16,7 @@ async function getModels(over: Partial<Env> = {}) {
   const ctx = createExecutionContext()
   const res = await worker.fetch(new Request('http://agent/api/models'), { ...(env as Env), ...over }, ctx)
   await waitOnExecutionContext(ctx)
-  return { status: res.status, body: (await res.json()) as ModelListBody }
+  return { status: res.status, body: (await res.json()) as ModelListBody, headers: res.headers }
 }
 
 interface ModelListBody {
@@ -75,6 +75,28 @@ describe('GET /api/models', () => {
       { id: 'a/tools', tools: true, paid: false, context: 200000 },
       { id: 'z/plain', tools: false, paid: false },
     ])
+  })
+
+  it('follows a changed base URL on the next load, and tells the browser not to keep the list', async () => {
+    // An hour of cache once outlived a change of LLM_BASE_URL: the picker kept the old provider's
+    // models and the switch read as broken. Mutation check: put `max-age` back and the header
+    // assertion fails; cache by request again (both calls are the same URL) and the second
+    // interceptor stays pending.
+    fetchMock
+      .get('https://llm.example')
+      .intercept({ method: 'GET', path: '/v1/models' })
+      .reply(200, { data: [{ id: 'first/provider' }] }, { headers: { 'content-type': 'application/json' } })
+    fetchMock
+      .get('https://other.example')
+      .intercept({ method: 'GET', path: '/v1/models' })
+      .reply(200, { data: [{ id: 'second/provider' }] }, { headers: { 'content-type': 'application/json' } })
+
+    const before = await getModels()
+    const after = await getModels({ LLM_BASE_URL: 'https://other.example/v1' })
+
+    expect(before.headers.get('cache-control')).toBe('no-store')
+    expect(before.body.models.map((m) => m.id)).toEqual(['first/provider'])
+    expect(after.body.models.map((m) => m.id)).toEqual(['second/provider'])
   })
 
   it('normalises both catalogues to dollars per million tokens', async () => {

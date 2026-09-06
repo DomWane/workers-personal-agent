@@ -180,7 +180,7 @@ Set in `wrangler.jsonc`.
 | :--- | :--- |
 | `GET /` | The chat UI, served from `./public` |
 | `/agents/personal-agent/*` | WebSocket and RPC for the agent; the DO name is rewritten server-side so a client cannot address someone else's conversation |
-| `GET /api/models` | The provider's model catalogue, proxied and cached for an hour |
+| `GET /api/models` | The provider's model catalogue, proxied, never cached |
 | `GET /api/threads` | The conversation list, read from the vault |
 | `POST /admin/reindex` | Forces the nightly index reconcile |
 | `POST /dev/chat`, `POST /dev/seed` | Localhost only |

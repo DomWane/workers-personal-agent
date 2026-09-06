@@ -435,10 +435,10 @@ Two traps ahead of the run itself, both cost a few minutes:
   2026-08-23 ([research.md](decisions/research.md)); typing it just asks the model, which answers
   from a normal turn. `proposeResearch` and `startResearch` are `@callable`, so the composer's
   **Chat → Deep research** toggle is the only door and `/dev/chat` cannot open it.
-- **Hard-reload before trusting the picker.** After a run against the stub the browser still holds
-  the stub catalogue for an hour, so the picker offers `stub-large` while the Worker now talks to
-  OpenRouter — and a thread left on that override sends a model name the provider has never heard
-  of. The meter is the tell: `/200k` is the stub's window, `/1049k` the real one.
+- **Check the thread's override after leaving the stub.** The catalogue is fetched fresh on every
+  load, but a thread left on `stub-large` keeps sending that name once the Worker talks to
+  OpenRouter, which has never heard of it. The meter is the tell: `/200k` is the stub's window,
+  `/1049k` the real one.
 
 Walked 2026-09-03 on `deepseek/deepseek-v4-flash`, four angles, `stopCause: 'time'` — the bound
 meant to fire. What it settled, and none of it could be settled by a unit test:

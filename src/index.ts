@@ -117,7 +117,7 @@ export default {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/models') {
-      return handleModelList(request, env, ctx)
+      return handleModelList(env)
     }
 
     // A Worker route rather than an agent RPC: the client needs the list *before* it has picked a
@@ -174,24 +174,17 @@ async function reconcileVault(env: Env): Promise<void> {
   console.log(JSON.stringify({ at: 'reindex', stage: 'slices-exhausted', slices: MAX_REINDEX_SLICES }))
 }
 
-/** An hour: a provider's catalogue moves on the order of days, and the browser asks on every load. */
-const MODEL_LIST_TTL_SECONDS = 3600
-
 /**
  * The model picker's catalogue. Proxied rather than fetched from the browser because the list
- * needs the LLM credential; cached so a page reload does not spend a subrequest. Any failure
- * answers with the model this deployment runs and an empty list — the picker then still names the
- * model, which is the part the user must always see, and merely offers nothing to switch to.
+ * needs the LLM credential. Any failure answers with the model this deployment runs and an empty
+ * list — the picker then still names the model, which is the part the user must always see, and
+ * merely offers nothing to switch to.
+ *
+ * Never cached, on either side. It was, for an hour, and the hour outlived a change of
+ * `LLM_BASE_URL`: the picker kept offering the old provider's models and the switch read as broken.
+ * One catalogue fetch per page load is what that costs.
  */
-async function handleModelList(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-  // The cache is process-wide and outlives a test's mocks, so one test's payload would answer the
-  // next one's request. Off outside production, where a repeated fetch costs nothing that matters.
-  const cache = env.ENVIRONMENT === 'production' ? caches.default : null
-  const cached = await cache?.match(request)
-  if (cached) {
-    return cached
-  }
-
+async function handleModelList(env: Env): Promise<Response> {
   const cfg = llmConfig(env)
   let models: ModelRow[] = []
   try {
@@ -205,14 +198,7 @@ async function handleModelList(request: Request, env: Env, ctx: ExecutionContext
     console.log(JSON.stringify({ at: 'model-list', error: String(err) }))
   }
 
-  const body = Response.json(
-    { current: env.LLM_MODEL, models },
-    { headers: { 'cache-control': `public, max-age=${MODEL_LIST_TTL_SECONDS}` } },
-  )
-  if (cache) {
-    ctx.waitUntil(cache.put(request, body.clone()))
-  }
-  return body
+  return Response.json({ current: env.LLM_MODEL, models }, { headers: { 'cache-control': 'no-store' } })
 }
 
 /** The SDK routes /agents/{kebab-class}/{name}. Only PersonalAgent is reachable from the web, and

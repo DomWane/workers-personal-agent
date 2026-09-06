@@ -84,9 +84,10 @@ Two more, both found the hard way:
 - **`SELF.fetch` cannot see a mutated `env`.** The pool hands the test a copy, so a test that needs
   a different binding (the Cloudflare provider branch, where `LLM_BASE_URL` is *absent* while the
   suite pins it) must call `worker.fetch(request, {...env, LLM_BASE_URL: undefined}, ctx)` directly.
-- **The Cache API outlives a test's mocks.** `/api/models` therefore caches only in production;
-  otherwise one test's payload answers the next test's request. Varying the URL per test was
-  rejected: test scaffolding does not belong in a URL contract.
+- **The Cache API outlives a test's mocks.** `/api/models` cached in it once, and one test's
+  payload answered the next test's request; it no longer caches at all, because an hour of cache
+  also outlived a change of `LLM_BASE_URL` and read as the switch not working. Varying the URL
+  per test was rejected: test scaffolding does not belong in a URL contract.
 - **A fake standing in for the seam under test empties the test silently.** Every scout test handed
   the loop a `Map` for its archive, so when the scout gained a real one on 2026-09-02 the code that
   builds it, `sqlTag(this.ctx.storage.sql)` inside a class declared under `new_sqlite_classes`,
