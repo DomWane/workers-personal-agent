@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TriangleAlertIcon } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import {
   ModelSelector,
@@ -37,6 +38,13 @@ const current = computed(() => props.override ?? (props.deploymentModel || 'load
 function row(id: string): ModelRow {
   return props.catalogue.find((m) => m.id === id) ?? { id, tools: true, paid: false }
 }
+
+/** Said, not blocked: a catalogue that answered and lacks the deployment's model is most likely a
+ *  typo in `LLM_MODEL`, which otherwise shows up as every turn failing. An empty catalogue says
+ *  nothing. Still selectable, because a gateway's list can be partial. */
+const notListed = computed(
+  () => props.catalogue.length > 0 && !props.catalogue.some((m) => m.id === props.deploymentModel),
+)
 
 /** The deployment's own model leads the list, so returning to it is one click rather than a
  *  command the user has to know. */
@@ -89,10 +97,19 @@ function pick(id: unknown) {
       <Button
         size="sm"
         variant="outline"
-        class="max-w-56 justify-start truncate font-mono"
+        class="max-w-56 justify-start font-mono"
         :class="props.compact ? 'h-7 px-2 text-[11px]' : 'text-xs'"
       >
-        {{ current }}
+        <!-- Only a mark here: the button has no room for the words, the list row has them. -->
+        <TriangleAlertIcon
+          v-if="notListed && !props.override"
+          class="size-3.5 shrink-0 text-amber-600 dark:text-amber-500"
+          aria-label="Not in catalogue"
+        >
+          <title>LLM_MODEL is not in the provider's catalogue</title>
+        </TriangleAlertIcon>
+        <!-- `truncate` on the button clipped without an ellipsis: the name is a flex item there. -->
+        <span class="min-w-0 truncate">{{ current }}</span>
       </Button>
     </ModelSelectorTrigger>
     <ModelSelectorContent title="Choose a model" @update:model-value="pick">
@@ -107,6 +124,14 @@ function pick(id: unknown) {
               <span v-if="contextLabel(model)" class="tabular-nums">{{ contextLabel(model) }}</span>
               <Badge v-if="unusable(model)" variant="outline" class="text-[10px]">
                 {{ unusable(model) }}
+              </Badge>
+              <Badge
+                v-else-if="notListed && model.id === props.deploymentModel"
+                variant="outline"
+                class="gap-1 border-amber-600/50 text-[10px] text-amber-600 dark:text-amber-500"
+              >
+                <TriangleAlertIcon class="size-3" />
+                Not in catalogue
               </Badge>
             </span>
           </ModelSelectorItem>

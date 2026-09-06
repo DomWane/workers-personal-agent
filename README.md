@@ -135,7 +135,9 @@ The agent talks to any OpenAI-compatible API. One variable decides which:
 
 The model picker in the UI reads the provider's own catalogue and shows, per model, price per
 million tokens, context window, and whether it supports tool calling. Models the deployment cannot
-call are still listed, greyed out.
+call are still listed, greyed out. If the catalogue answers and `LLM_MODEL` is not in it, the
+picker puts a warning sign by the name and the list says "Not in catalogue": almost always a typo
+in the id, which would otherwise show up as every turn failing.
 
 **Tool calling is not optional.** The agent is a tool loop; a model without it cannot search, read,
 or remember. Four Workers AI models were verified to return proper `tool_calls` on the Free plan:
@@ -305,7 +307,8 @@ read their half.
 **The UI loads but nothing answers.** Check `wrangler tail`. A 401 from the provider is the
 credential: `CF_API_TOKEN` without Workers AI: Read on the default, or a missing `LLM_API_KEY` with
 `LLM_BASE_URL` set. An empty model picker usually means the same credential cannot read the
-catalogue.
+catalogue. A warning sign on the picker means the credential is fine and `LLM_MODEL` names a model
+the provider does not list.
 
 **`read_page` keeps falling back.** Browser Rendering on the Free plan allows one request every ten
 seconds, and a research wave outruns that in its first round. The log line carries `why`.
