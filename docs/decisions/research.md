@@ -1,224 +1,157 @@
-# Deep research: waves, what bounds a run, and what the first real runs taught
+# Deep research
 
-Read this before changing a cap, a scout, or how a round decides to stop. Every number here is
-measured; where the first value was wrong, the measurement that replaced it is recorded beside it.
+Decisions behind the research mode. The current values sit in the limits table in
+[ARCHITECTURE.md](../../ARCHITECTURE.md); this file holds why they are what they are.
 
-**A round with more than one angle to split is a wave, not a round.** One `ResearchScout` Durable
-Object per angle, all awaited at once, each with its own fifty subrequests and its own thirty
-seconds of CPU. Round zero splits the plan; later rounds split the open questions, which is where
-the depth is. The width narrows by two a round, after Static-DRA's `max(b - 2i, 1)` (arXiv 2512.03887): the first round
-is the landscape and deserves the whole wave, and a run that kept fanning out at every depth would
-re-read the landscape instead of chasing what it did not settle. Under two angles it is an ordinary
-round. The wave's spend is reported as `scoutSpent` and never charged to `RESEARCH_SUBREQUEST_BUDGET`,
-because it was drawn from the scouts' invocations and not from this one; folding it in would end the
-depth rounds early for money the run never spent.
+## A round with several angles is a wave of scout Durable Objects
 
-The wave also replaced `RESEARCH_MIN_ROUNDS`, a floor of six added because three runs in a row ended
-after one round and nine pages: the model answered `## Done: yes` and nothing overruled it. Once
-every plan angle is covered before the model can hold that opinion, the verdict no longer needs
-overruling — and a deadline a floor can overrule is not a deadline.
+**Decision.** One `ResearchScout` per angle, awaited at once. Round 0 splits the plan, later rounds
+the open questions. Width narrows by two a round (Static-DRA, arXiv 2512.03887); under two angles it
+is a plain round.
+**Why.** Each scout has its own fifty subrequests and thirty seconds of CPU (measured 2026-08-08),
+so breadth costs the parent one internal call per angle.
+**Rejected.** `RESEARCH_MIN_ROUNDS = 6`. Three runs ended after one round on `## Done: yes`; once
+the wave covers every angle the verdict needs no overruling, and a deadline a floor can overrule is
+not a deadline.
+**Note.** Scout spend is reported as `scoutSpent` and never charged to `RESEARCH_SUBREQUEST_BUDGET`;
+folding it in ended depth rounds early for money the parent never spent.
 
-Scouts run `SCOUT_MODEL` when it is set, falling back to `LLM_MODEL`; the picker still overrides both,
-because an explicit act by the user beats a deployment default. A wave is where the tokens go and a
-scout reads and reports rather than writing the report, which is what makes it the part worth
-trading down first. Anthropic's published multi-agent research system splits it the same way, a
-stronger lead over cheaper subagents.
+## Scouts run `SCOUT_MODEL`, and the picker overrides it
 
-**A scout keeps an archive of its own, and it dies with the run.** Without one, `shorten()` returned
-its input untouched — there was no ref to shorten to — so the pruner ran every round and saved
-nothing, the request grew by a whole page per round, and with no overflow retry outside
-`PersonalAgent` the angle was lost as `scout-failed`. At the picker's low end a search plus a read is
-~4,800 tokens a round, so a 24k scout died around round four of twelve. Three choices inside it:
+`modelOverride ?? SCOUT_MODEL ?? LLM_MODEL`. A wave is where the tokens go and a scout reads rather
+than writes, so it is the part worth trading down; an explicit pick by the user still beats a
+deployment default. Anthropic's multi-agent research system splits the same way.
 
-- **It lives in the scout's own SQLite and is never read again.** Writing to the parent over RPC was
-  the alternative and costs one internal call per tool result; the report is written from findings,
-  never from a scout's archive, so nothing needs to outlive the run.
-- **The scout gets `read_tool_result` and not `search_tool_results`.** Its archive holds one run's
-  own reads, so searching it is close to searching what it just did. The tool is offered only where
-  an archive exists — one that can answer nothing but its own error is worse than an absent one.
-- **Below ~27,300 tokens of window the pruner still cannot act**, because `resultCap` puts every
-  result under `PRUNE_OVER_CHARS` — the two caps cancel, and the smaller the window the more surely
-  they do. Said rather than fixed: `stage: 'prune-inert'` names it at the start of a run and a test
-  pins the crossover. Tuning the two thresholds against each other buys a round or two before the
-  sum overflows anyway.
+## A scout has an archive of its own, in its SQLite, dead with the run
 
-The archive is exercised against the real Durable Object's SQLite in `test/unit/research-scout.test.ts`
-because its failure mode is quiet: an `appendArchive` that throws is caught as `archive-failed`, the
-angle still returns findings, and the pruner is simply mute for the whole run.
+**Decision.** `toolArchiveOver(sqlTag(this.ctx.storage.sql))`, with `read_tool_result` offered and
+`search_tool_results` not.
+**Why.** Without one `shorten()` had no ref, the pruner saved nothing, and a 24k scout overflowed
+around round four (a search plus a read is ~4,800 tokens). A scout has no overflow retry, so the
+angle was lost as `scout-failed`.
+**Rejected.** Writing results to the parent over RPC: one internal call per result, and the report
+is written from findings, never from a scout's archive.
+**Known limit.** Below ~27,300 tokens `resultCap` puts every result under `PRUNE_OVER_CHARS`, so
+the pruner is inert. Logged as `stage: 'prune-inert'` and pinned by a test rather than tuned.
+**Test.** `test/unit/research-scout.test.ts` runs the real Durable Object, because a failing
+`appendArchive` is caught as `archive-failed` and the run looks healthy.
 
-**A round's whole result becomes durable in one `setState`, and that write failed once.** The first
-production wave logged `SqlError: SQL query failed: internal error` in the same second the wave
-closed. Four scouts, 57 subrequests and four angles of findings were discarded: the clear in the
-`catch` was the next write and failed too, the rejection escaped the handler, the Agents SDK kept
-the schedule row, and the retried alarm ran an ordinary round over the state written _before_ the
-round. The evidence is in the next round's record: `spent: 70` is `chargeRound`'s 50 plus that
-round's 20, and `rounds: 1` where a wave of four should have left four. Both writes now go through
-`retryOnce`, and the clear has its own `catch` so a failure there can no longer take the handler
-with it.
+## A round's result lands in one `setState`, retried once
 
-**`SCOUT_TIMEOUT_MS` is 180 s, set from production rather than from local runs.** Local scouts took
-45–90 s and the first value was 120 s; in production two of four came back at about 138 s and 162 s,
-after the wave had closed, with their pages paid for and thrown away. A test ties the constant to
-that measurement.
+`saveResearchState` wraps the write in `retryOnce`, and the clear in the `catch` has its own
+`catch`. On 2026-08-10 `SqlError: SQL query failed: internal error` discarded a four-scout wave: the
+clear failed too, the rejection escaped, the SDK kept the schedule row, and the retried alarm ran an
+ordinary round over the pre-wave state (`spent: 70`, `rounds: 1`).
 
-**A round that could not have sourced anything has its findings dropped.** No page opened _and_ no
-search result seen means whatever the model wrote came out of its own memory, and the report is
-written from these entries beside researched text. Two scouts on the first real run did exactly that
-— zero pages, two thousand characters each. A snippet alone still counts, because a claim cited from
-a search result is honest sourcing. It is the one place where something is discarded rather than
-reported, and it earns that because there is provably no source behind it.
+## `SCOUT_TIMEOUT_MS` is 180 s
 
-**A third of searches came back "empty" on the second real run, and none of them were.** All 15 of
-43 were Firecrawl **429s** — `Consumed (req/min): 11, Remaining: 0`, with the counter climbing while
-rejecting, so a retry inside the same minute makes it worse. The Free plan allows 10 searches a
-minute and the wave asked for 19 in its first. Two things came from that. A refused search reads as a
-tool failure rather than `(no results)` — the old wording was the reason scouts closed an angle and
-wrote from memory — and it is never filed as a query that found nothing, which is what
-`emptySearches` is for. And **Tavily leads the search chain**: 1 credit against Firecrawl's 2, and
-100 requests a minute against 10. Firecrawl stays under it because the two return different things —
-Tavily finds official and primary sources, Firecrawl finds preprints; domain overlap on five real
-queries was 0, 0, 3, 1 and 2 out of five. Both answer without a key — Tavily behind an
-`X-Tavily-Access-Mode: keyless` header, Firecrawl by omitting `Authorization` — at rate limits
-neither states precisely, so a deploy with no search secret still searches and a key is what raises
-the ceiling. There is no scraper under them: DuckDuckGo's HTML endpoint sat at the bottom of the
-chain once and never returned a result from a Worker, answering 202 with a challenge page.
+Local scouts took 45 to 90 s and the first value was 120 s. In production two of four finished at
+about 138 s and 162 s after the wave had closed, their pages paid for and thrown away. The cap must
+clear the slowest scout still working; a test ties the constant to the measurement.
 
-**A search brings every hit back whole, and `read_page` on one of them is a lookup.** Tavily's
-`include_raw_content: "markdown"` returns each result's page in the same call and the same one
-subrequest; its [endpoint reference](https://docs.tavily.com/documentation/api-reference/endpoint/search)
-prices `search_depth` and lists no charge for the parameter. Probed keyless on 2026-09-06:
+## A round with no source has its findings dropped
 
-```
-curl https://api.tavily.com/search -H 'x-tavily-access-mode: keyless' \
-  -d '{"query":"Cloudflare Workers subrequest limit free plan","max_results":5,"include_raw_content":"markdown"}'
-```
+No page opened and no search hit seen means the findings came from the model's memory; they are
+discarded and logged `stage: 'ungrounded-round'`. Two scouts on the first real run wrote 2,000
+characters each from zero pages. A snippet alone still counts. This is the one place something is
+discarded rather than reported, because there is provably no source.
 
-Five results, `raw_content` of 1.8k, 19k, 26k, 3.3k and 3.2k characters, 1.5 s. The round keeps
-them for the invocation, and a chat turn for the turn; `read_page` checks that store before it
-fetches, and a hit is logged `via: search-cache`, counted as a read because the model saw the page,
-and charged nothing because nothing was requested. On the Free plan this is what lets a wave read
-at all: Browser Rendering allows one request every ten seconds per account and five scouts were
-losing half their reads to it (below). The pages are not put into the search result itself, because
-ten of them inline would overflow a 24k window that a 500-character snippet fits. Firecrawl's search
-can do the same with `scrapeOptions`, and [its docs](https://docs.firecrawl.dev/features/search)
-price it at 2 credits per ten results plus 1 per scraped page — 12 for a ten-result search where
-the model opens one or two — so the fallback vendor stays snippet-only.
+## Tavily leads the search chain, Firecrawl second, no scraper
 
-**`read_page` falls back to Firecrawl because of our own concurrency, not the site.** The fallback
-records `why`, and a run on 2026-09-03 settled it: 14 of 30 reads failed with Cloudflare's own
-`code: 2001, Rate limit exceeded`. `read_page` calls `/browser-rendering/markdown`, a **Quick
-Action**, limited on the Free plan to one request every ten seconds; the 3-concurrent /
-3-new-a-minute figures in the same limits page govern Browser Sessions, which nothing in this repo
-opens.
+**Decision.** Tavily (1 credit, 100 a minute) before Firecrawl (2 credits, 10 a minute). A refused
+search returns an `error:` naming a tool failure, never `(no results)`, and is not counted as an
+empty query.
+**Why.** On the second real run 15 of 43 searches were Firecrawl 429s, the wave having asked for 19
+in its first minute, and scouts read `(no results)` as a fact and closed the angle. Both vendors stay
+because they find different things: domain overlap on five queries was 0, 0, 3, 1 and 2 of five.
+Both work keyless (Tavily `X-Tavily-Access-Mode: keyless`, Firecrawl without `Authorization`).
+**Rejected.** DuckDuckGo's HTML endpoint at the bottom: every Worker request got a 202 challenge
+page.
 
-**A citation the run never saw is logged, not removed.** `ungroundedCitations` compares the URLs in a
-round's findings against `visited` _and the URLs searches put in front of the model_, so the check
-needs no model and no network. Grounding on `visited` alone flagged seventeen citations in one round
-of the first real run, and every one was a real page a search had returned and the round had chosen
-not to open. The check exists because findings are appended and never verified and the report is
-written from all of them: an invented source reaches the reader looking exactly like a real one —
-the failure DeepHalluBench (arXiv 2601.22984) names as invisible to end-to-end evaluation, and a wave
-makes it likelier, since four scouts never see each other's sources. Reported rather than stripped,
-because dropping them quietly would read as clean while losing real citations to a formatting slip.
+## A Tavily hit carries its page, and `read_page` on it is a lookup
 
-A research run keeps one entry per round in `findings`, appended and never rewritten, and the
-report is written from all of them in one call at the end. The first design rewrote a single
-`notes` document every round, which put every early finding through twelve compressions; this puts
-each through one. `FINDINGS_SHOWN` bounds only what a round is _shown_ — nothing shown there is the
-only copy.
+**Decision.** `include_raw_content: 'markdown'`; pages kept in `pageCache` for the invocation, keyed
+by `pageKey`. A hit is logged `via: search-cache`, counted as a read, charged nothing.
+**Evidence.** Probed keyless 2026-09-06: five results with raw pages of 1.8k to 26k characters in
+1.5 s, same credit (the endpoint reference lists no charge for the parameter). On a real run 17 of
+31 reads were served this way. The pages are not inlined into the search result: ten of them
+overflow a 24k window that a snippet fits.
+**Rejected.** Firecrawl `scrapeOptions`: 2 credits per ten results plus 1 per scraped page, 12 for a
+search where the model opens one or two.
 
-**The request budget is derived from the round cap, not set beside it.** A round measured 28, 31
-and 32 subrequests across three real runs, each using all six of the tool loop's rounds, so
-`RESEARCH_SUBREQUEST_BUDGET` is `(12 - 1) × 32 + 50` and cannot bind before `RESEARCH_MAX_ROUNDS`
-does. Set independently, the two drifted apart once: 250 with a cap of 20 funded 7 rounds, which
-would have made a floor of 8 unreachable. A later run spent 15 to 28 per round, so the cap is looser
-than intended rather than tighter.
+## `read_page` falls back because of our own concurrency
 
-**Five minutes is a choice about the user.** The run is watched: a status card someone is looking at
-is a different product from a job they come back to, and what buys the shortness is the wave, which
-covers the breadth a sequential agent spends rounds on. No competitor's figure is cited for it,
-because it is a judgement and a citation would only make it look derived.
+`/browser-rendering/markdown` is a Quick Action, limited on Free to one request every ten seconds;
+14 of 30 reads failed with `code: 2001` on 2026-09-03. The 3-concurrent figures on the same limits
+page govern Browser Sessions, which nothing here opens. The fallback logs `why` and `fallbackWhy`.
 
-**The proposal card offers three lengths, and the preset rides on the run.** `quick` is two
-minutes and four scouts, `normal` the five minutes and five above, `deep` ten minutes and five.
-The width and the deadline are read from `state.preset` by every round of the alarm chain, so a run
-cannot change shape halfway; absent means `normal`, which is what a run started before presets
-existed or a seeded one gets. `quick` exists for the Free plan: one scout fewer against Browser
-Rendering's one request per ten seconds, and a fifth fewer neurons for the same landscape. It
-started at three, which was a guess, and the guess had a cost: a plan holds up to four angles,
-and the fourth was never scouted and the next round was never told. Raised to four once the search
-cache served 17 of 31 reads without a fetch, which halved what a scout asks of the rate limit.
-In practice it is one wave and the report, because a round measured at 70 s plus the
-headroom for another does not fit twice in two minutes. **The first round is never refused for
-time**: before any round has run the headroom is the worst case, 210 s, which is more than
-`quick`'s whole deadline, and the first real `quick` run ended "done" with nothing gathered because
-the clock was checked at round zero. A run that has not gathered anything has nothing to report,
-so the deadline starts counting against the second round. **The clock bounds the reading, and the
-card says so**: writing the report took 91 s, 239 s and 172 s on the first three `quick` runs
-(deepseek flash through OpenRouter, 13k to 17k characters out; the times are the gap between the
-`wave` and `report-written` records in the dev log, since `report-written` carries no duration of
-its own), each longer than the two minutes the card had promised, with the card still saying
-"Researching". The preset copy now reads "Reads for up to 2 minutes … then writes the report", and
-`state.writing` turns the card's title into "Writing the report" for that stretch. A stop pressed
-during that stretch stands: `finishResearch` checks `isCurrentRun` before it writes `done`, or the
-report would put the stopped run back.
+## Ungrounded citations are logged, not removed
 
-**The wave reports as it goes.** A wave's two minutes showed the card nothing but zeros, because the
-scouts run in their own Durable Objects and the parent wrote state once, when the wave landed. The
-parent now writes one `scouts` row per angle before the wave starts, and each scout calls the
-parent's `scoutProgress` after every search and read with its running counts: an internal call,
-out of the thousand rather than the fifty, not awaited, and dropped after the first failure so a
-report that cannot land costs the angle nothing. Keyed by run id, so a scout from a stopped run
-changes nothing. `applyWave` clears the rows; the card shows them while they exist. `deep` says on the card what it costs — on Workers AI Free a ten-minute run is a large share of
-the day's 10,000 neurons, a figure not yet measured because nothing sums `cf-ai-neurons` across a
-run — because that is where the run is approved, and a warning in the README is not read at that
-moment. The request and round caps are unchanged: they are safety nets
-under the deadline, and a preset only moves the deadline.
+`ungroundedCitations` compares a round's URLs against `visited` and the URLs searches showed, with
+no model and no network. Grounding on `visited` alone flagged 17 real citations in one round.
+Reported rather than stripped: an invented source looks exactly like a real one (DeepHalluBench,
+arXiv 2601.22984), and stripping would lose real ones to a formatting slip.
 
-**A run carries what it cost, in the providers' own count.** Every round and every scout returns
-the tool loop's `tokensSpent`, the report call adds its `usage`, and the sum rides on
-`state.tokens` for the status card and the finished report's summary line. The plan call is not
-counted: it is one short call before the run exists. A provider that reports no `usage` leaves the
-field absent, so the card shows no number rather than a free-looking zero. The first `quick` run
-measured this way: one scout's `done` record carried `tokensSpent: 222080` after 57 s on deepseek
-flash, three whole runs came to 516k, 548k and 536k. At the catalogue's $0.045 per million that is
-about three cents a run there; on Workers AI Free it would be a large share of the day's neurons,
-unmeasured.
+## Findings are appended per round; the report is written once
 
-**Four caps bound a run, and only one of them is meant to fire.** The order in `shouldContinue` is
-the hierarchy: the deadline (five minutes on `normal`) is the hard bound, requests and rounds are safety nets under
-it that a ~150 s round should never reach, and the two judgements — `no-new-ground`, then
-`model-done` — come last. The deadline keeps a whole round of headroom, because "stop after five
-minutes" checked between rounds otherwise means starting a round at 4:59 and finishing at 7:30. The
-headroom is **measured**: `roundHeadroomMs` reserves the longest round this run has actually
-finished, and falls back to `ROUND_WORST_CASE_MS` only until there is a round to measure. The
-constant alone cost half the deadline on the first real run — rounds took 78 s and 69 s against a
-150 s reservation, so a five-minute run stopped at 152 s with two rounds done.
-`ROUND_WORST_CASE_MS` is derived from `SCOUT_TIMEOUT_MS`, because when the two were both 150 s a
-wave where every scout ran to its timeout consumed the entire headroom. The deadline bounds the
-gathering and not the report that follows: a run that collected material and then dropped it for
-the clock would be worse than one that ran half a minute long.
+The first design rewrote one `notes` document every round, putting early findings through twelve
+compressions. `FINDINGS_SHOWN = 3` bounds what a round is shown, not what the report reads.
 
-The nightly reflection had the same two faults as a research round — a budget its work outran, and a
-forced final call that came back empty — after a real night produced `🪞 Reflection: (no answer
-produced — try rephrasing)` with every edit written and only the sentence describing them lost. It
-runs with `REFLECTION_BUDGET_MS = 240000` and asks for its own summary, and the extra call is made
-only when the loop had nothing to say.
+## The request budget derives from the round cap
 
-Both the `done` record and the `turn` record carry `stopReason`: one of `complete`, `max-rounds`,
-`time-budget`, `subrequest-budget`, `no-progress`, or `error` on a failed turn. A research run has
-its own vocabulary and its own field name — `stopCause`, one of `time`, `budget`, `max-rounds`,
-`no-new-ground`, `model-done`, `not-running` — because two unrelated unions under one key made a
-log line unreadable without knowing which produced it. Each replaced independent booleans that could
-be true at once and never said which fired first.
+A round measured 28, 31 and 32 subrequests over three runs, so
+`RESEARCH_SUBREQUEST_BUDGET = (12 - 1) × 32 + 50 = 402` and cannot bind before `RESEARCH_MAX_ROUNDS`.
+Set independently, 250 against a cap of 20 once funded 7 rounds under a floor of 8.
 
-**The composer's toggle is the only way to start a run, and the model has no say.** A
-`deep_research` tool that let the model propose a run was tried and removed, because the judgement
-it asked for — is this ask worth minutes and hundreds of requests — went wrong in both directions:
-silent on _"Research companies using Cloudflare"_ against a description that opened with
-**REQUIRED**, and the same latitude would have proposed runs nobody wanted. What the toggle gives up
-is discoverability: a user who does not know it exists will not be told. That is the trade, and it
-is one line of system prompt to undo if it starts to matter.
+## Three presets; the deadline is the only cap meant to fire
 
-A finished report lives in `state.research.report`, never in the conversation; how the agent fetches
-it when a turn needs it is in [web-and-channels.md](web-and-channels.md).
+**Decision.** `quick` 120 s and 4 scouts, `normal` 300 s and 5, `deep` 600 s and 5. The preset rides
+on the run, so a run cannot change shape halfway. Five minutes is a judgement about a watched status
+card, not a cited figure.
+**`quick`.** Started at three scouts, which dropped the fourth plan angle silently; raised to four
+once the search cache halved what a scout asks of Browser Rendering. In practice one wave and the
+report.
+**The first round is never refused for time.** Before any round the reservation is the 210 s worst
+case, more than `quick`'s deadline, and the first `quick` run ended "done" with nothing.
+**The clock bounds the reading, not the report.** Writing took 91 s, 239 s and 172 s on the first
+three `quick` runs (13k to 17k characters out). The card says "Writing the report" (`state.writing`)
+for that stretch, and Stop during it holds because `finishResearch` checks `isCurrentRun` before
+writing `done`.
+**Headroom is measured.** `roundHeadroomMs` reserves the longest round this run has finished, floor
+60 s. The worst case alone (150 s) stopped a five-minute run at 152 s with two rounds of 78 s and
+69 s done. `ROUND_WORST_CASE_MS` derives from `SCOUT_TIMEOUT_MS`: when both were 150 s the
+reservation was the whole headroom.
+**Order in `shouldContinue`.** Time, budget, rounds, `no-new-ground`, `model-done`. Each replaced
+booleans that could all be true at once.
+
+## The wave reports as it goes
+
+The parent writes one `scouts` row per angle before the wave; each scout calls `scoutProgress` over
+RPC after every search and read, not awaited, dropped after the first failure, keyed by run id.
+Two minutes of zeros on the card read as a hang.
+
+## A run carries its token cost
+
+Rounds, scouts and the report call sum `usage` into `state.tokens`; the plan call is not counted;
+no `usage` means no number rather than zero. Three `quick` runs cost 516k, 548k and 536k tokens,
+about three cents each on deepseek flash via OpenRouter. On Workers AI Free that is a large share of
+the day's 10,000 neurons, unmeasured, which the `deep` preset says on the card.
+
+## Reflection had the same two faults
+
+The loop's 90 s budget cut a real night at 113.6 s, and the forced final call came back empty with
+every edit already written. `REFLECTION_BUDGET_MS = 240_000`, and the summary is asked for only
+when the loop said nothing.
+
+## `stopReason` and `stopCause` are separate fields
+
+The loop's `stopReason` (`complete`, `max-rounds`, `time-budget`, `subrequest-budget`,
+`no-progress`, `error`) and a run's `stopCause` (`time`, `budget`, `max-rounds`, `no-new-ground`,
+`model-done`, `not-running`) share no key: two unions under one name made a log line unreadable.
+
+## The composer toggle is the only way to start a run
+
+A `deep_research` tool was tried and removed: it stayed silent on "Research companies using
+Cloudflare" against a description opening with REQUIRED, and the same latitude proposed runs nobody
+wanted. The cost is discoverability. Where the finished report lives and how a turn reads it:
+[web-and-channels.md](web-and-channels.md).

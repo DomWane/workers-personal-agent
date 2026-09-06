@@ -1,63 +1,48 @@
-# Provenance, the destructive-write gate, and the ratings nothing reads yet
+# Provenance and the destructive-write gate
 
-Read this before changing how a memory is written, archived, or justified. The gate exists because
-unaided self-correction makes reasoning worse (Huang et al., ICLR 2024, arXiv:2310.01798); what it
-actually enforces today is narrower than that, and the gap is recorded here rather than glossed.
+The gate exists because unaided self-correction makes reasoning worse (Huang et al., ICLR 2024,
+arXiv 2310.01798), and "newest wins" is that judgement. What it enforces today is narrower than the
+design, and the gap is recorded here.
 
-**Ratings are collected and nothing reads them yet — neither half.** The design gives the gate three
-signals; only one is built. `delete_memory` is grounded on a **cited user turn**, verified against
-the thread that holds it; the thumbs-down the design names as the strongest signal is written to the
-archive and read by nothing, and the other two — a tool error, and a contradiction evidenced by two
-archived turns with times — are not implemented at all. That is a gap, not a design: the gate today
-runs on citations alone.
+## The gate covers the two writes that destroy something
 
-Keeping the ratings anyway is the one case where "no reader yet" is not the argument it usually is.
-A judge calibrated only on failures has no false-positive rate — TPR without TNR — so the positive
-class is what makes the negatives measurable later; and unlike code, this data cannot be added
-retroactively, so switching it on in six months loses everything before that day, at ~100 bytes a
-click against DO SQLite's 10 GB. Two things it must not be read as: the ratio of ratings is **not**
-a quality metric, because people click when annoyed; and nothing exports the archive today, so
-`evals/` cannot reach it — a rating is a label with no path out of the Durable Object it lives in.
+`delete_memory` and `op=replace` or `remove` on the profile need a cited user turn, verified against
+the thread that holds it. Appending is free, and so is `save_memory` under an existing name:
+gating updates would refuse most of what the assistant learns. The previous text of an overwritten
+memory is lost, the one hole in "compaction is the only thing that destroys history". The profile
+was nearly missed and matters most: it is the write the nightly prompt steers toward first, and a
+line deleted there leaves the only memory the model always sees.
 
-**The gate covers both writes that destroy something: archiving a memory, and `op=replace`/`remove`
-on the profile.** Appending is free. The profile is the one that matters most and was nearly missed —
-it is the write the nightly prompt steers toward first ("reconcile contradictions"), it costs tokens
-on every single turn, and a line deleted there is gone from the only memory the model always sees.
-Overwriting a memory in place through `save_memory` is *not* gated: updating a fact under its own
-name is the intended way to keep memory current, and gating it would refuse most of what the
-assistant learns. The previous text of an overwritten memory is genuinely lost — the one hole left in
-"compaction is the only thing that destroys history".
+## In a chat the gate satisfies itself
 
-**In a chat the gate satisfies itself, deliberately.** With no `cited_turn` the tool falls back to
-the user message the turn is answering, which always verifies — so archiving from a conversation is
-effectively ungated. That is the honest reading of "an explicit user correction": the user is
-present and has just spoken. It is also the only citable thing there, because the history the model
-sees carries no ids. The unattended nightly pass has no such fallback, and that is the case the gate
-was built for.
+With no `cited_turn` the tool falls back to the turn being answered, which always verifies: the
+user is present and has just spoken, and the history the model sees carries no ids anyway. The
+unattended nightly pass has no fallback and is the case the gate was built for. `REFLECTION_PROMPT`
+tells it to send a `thread`; without one the citation resolves against `reflection`, which is never
+in the registry, and the model is told its thread was deleted, the one refusal that is false. This
+is why `delete_memory` advertises both fields as optional; the drift that forced the question is in
+[tool-boundary.md](tool-boundary.md).
 
-This is also why `delete_memory` advertises `cited_turn` and `thread` as **optional** — see
-[tool-boundary.md](tool-boundary.md) for the drift that forced the question. The nudge the nightly
-pass needs is in `REFLECTION_PROMPT`, the only place the unattended path is told to send a `thread`.
-Without one the citation resolves against `reflection`, which is never in the registry, and the
-model is told its thread was deleted — the one refusal that is a false statement.
+## Citations name a position, not an id
 
-**Withdrawing a rating appends `none` rather than deleting the row.** The table is append-only and a
-reader takes the last row per message, so a changed mind stays legible as a sequence — which is the
-point of keeping judgements rather than a current-state column.
+The nightly transcript labels turns `[n]` per thread and `citationLabels()` maps `thread#label` back
+to the id. A model copying a 36-character UUID slips a character, which arrives as a refusal
+indistinguishable from a fabricated citation. deepseek-v4-flash cited `"[1]"` with brackets on
+2026-08-18, so the tool strips them. `transcript` and `citationLabels` must agree; a test says so.
 
-**Every memory records where it came from, and `save()` will not write one without it.** The type
-requires `source: { thread, turn?, at }`, so a caller cannot forget; it lands in the frontmatter as
-flat `source_*` keys because the parser reads one `key: value` a line. Reading is tolerant — a
-memory written before this existed simply has none, which means old rather than suspect. Archiving
-files its grounds the same way (`archived_because_turn`), because a fact destroyed for a reason that
-lived only in a log is indistinguishable from one destroyed on a whim, three days later.
+## Every memory records its source
 
-What is *not* built: nothing resolves a memory's own pointer back to its turn, so the "source
-deleted" case the design asks for cannot arise yet — `resolveTurn` serves the citation check only.
+`save()` requires `source: { thread, turn?, at }`, written as flat `source_*` frontmatter keys
+because the parser reads one `key: value` a line. A memory from before this existed has none: old,
+not suspect. Archiving files its grounds as `archived_because_*` for the same reason a log line
+three days later cannot: a fact destroyed for a reason nobody can find looks like a whim. Not built:
+resolving a memory's own pointer back to its turn, so the "source deleted" case cannot arise yet.
 
-**Citations name a position, not a message id.** The nightly transcript labels turns `[1] User: …`
-per thread and `citationLabels()` maps `thread#label` back to the id. Ids are 36-char UUIDs, and a
-model copying one out of a long transcript slips a character — which arrives as a refusal
-indistinguishable from a fabricated citation. Verified against deepseek-v4-flash on 2026-08-18: it
-cited `"cited_turn": "[1]"`, brackets included, which is also why the tool strips them. The two
-halves — how `transcript` numbers and how `citationLabels` maps — must agree, and a test says so.
+## Ratings are collected and nothing reads them yet
+
+Of the three signals in the design only the cited turn is built. A thumbs-down goes to the archive
+as a `feedback` row (`none` withdraws; the table is append-only and a reader takes the last row per
+message); tool errors and contradictions between two archived turns are not implemented. The ratings
+are kept anyway because a judge calibrated only on failures has no false-positive rate, and unlike
+code this data cannot be added retroactively (~100 bytes a click). The ratio is not a quality
+metric, and nothing exports the archive, so `evals/` cannot reach it.
