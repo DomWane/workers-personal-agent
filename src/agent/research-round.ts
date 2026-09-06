@@ -1,5 +1,7 @@
 import type { TurnLog } from './log'
-import { RESEARCH_DEADLINE_MS, RESEARCH_SUBREQUEST_BUDGET, type ResearchState } from './research-state'
+import { presetOf, RESEARCH_SUBREQUEST_BUDGET } from './research-state'
+import { pageKey } from './tools/registry'
+import type { ResearchState } from '../types'
 
 /**
  * The prompt one research round is given, and the parser for what it returns. Pure, so the two
@@ -42,13 +44,14 @@ export function buildScoutPrompt(topic: string, angle: string, alreadyTried: str
       'Cover yours and only yours — the others are taken. Go wide within it: find the sources and ' +
       'what they say, not the last word on the topic.</focus>',
   ]
-    .filter((line) => line !== '')
+    .filter(Boolean)
     .join('\n')
 }
 
 export function buildRoundPrompt(state: ResearchState, log?: TurnLog, now: number = Date.now()): string {
   const remaining = Math.max(0, RESEARCH_SUBREQUEST_BUDGET - state.spent)
-  const remainingMs = state.startedAt ? state.startedAt + RESEARCH_DEADLINE_MS - now : RESEARCH_DEADLINE_MS
+  const deadlineMs = presetOf(state).deadlineMs
+  const remainingMs = state.startedAt ? state.startedAt + deadlineMs - now : deadlineMs
   const recent = state.visited.slice(-VISITED_SHOWN)
   const omitted = state.visited.length - recent.length
   // Loud rather than silent: what the prompt shows and what the run has actually read stop being
@@ -80,7 +83,7 @@ export function buildRoundPrompt(state: ResearchState, log?: TurnLog, now: numbe
     `<focus>${focusFor(state.round, state.waved ?? false)}</focus>`,
     `<budget>${remaining} requests remain of ${RESEARCH_SUBREQUEST_BUDGET}.</budget>`,
   ]
-    .filter((line) => line !== '')
+    .filter(Boolean)
     .join('\n')
 }
 
@@ -113,10 +116,13 @@ function findingsBlock(state: ResearchState, log?: TurnLog): string {
 export function ungroundedCitations(findings: string, visited: string[]): string[] {
   const cited = findings.match(/https?:\/\/[^\s)\]<>"'`]+/g) ?? []
   const out: string[] = []
+  // `visited` is already keyed; the citation is not. Compared raw, a run flagged twelve real pages
+  // in one round because the model cited them without the trailing slash it had read them under.
+  const known = new Set(visited.map(pageKey))
   for (const raw of cited) {
     // Trailing punctuation belongs to the prose, not the URL, and would fail every comparison.
-    const url = raw.replace(/[.,;:]+$/, '')
-    if (!visited.includes(url) && !out.includes(url)) {
+    const url = pageKey(raw.replace(/[.,;:]+$/, ''))
+    if (!known.has(url) && !out.includes(url)) {
       out.push(url)
     }
   }

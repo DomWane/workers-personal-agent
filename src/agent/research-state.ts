@@ -1,7 +1,9 @@
+import type { ResearchPreset, ResearchState, StopCause } from '../types'
+
 /**
- * The state a research run carries between alarms, and the rules for moving through it. Pure:
- * no I/O, no scheduling, so the transitions can be tested against literals rather than against
- * a Durable Object.
+ * The rules for moving a research run between alarms; the state's shape is `types/research.ts`.
+ * Pure: no I/O, no scheduling, so the transitions can be tested against literals rather than
+ * against a Durable Object.
  *
  * Rounds pass *findings*, not pages: a round is given a window of what earlier rounds found and
  * appends its own, so no round has to hold the pages the run has read.
@@ -16,9 +18,9 @@
 export const RESEARCH_SUBREQUEST_BUDGET = 402
 
 /**
- * The hard bound, and the only one meant to fire. Five minutes is about as long as anyone watches
- * a status card, and the work fits inside it because the breadth pass is a wave of parallel scouts
- * rather than two sequential rounds.
+ * The `normal` preset's bound, and the only kind meant to fire. Five minutes is about as long as
+ * anyone watches a status card, and the work fits inside it because the breadth pass is a wave of
+ * parallel scouts rather than two sequential rounds.
  *
  * It replaced a floor of six rounds, because two authorities over when a run may end cannot both be
  * final — `docs/decisions/research.md` has what the floor was for and why the wave retires it.
@@ -27,6 +29,29 @@ export const RESEARCH_SUBREQUEST_BUDGET = 402
  * dropped it for the clock would be worse than one that ran half a minute long.
  */
 export const RESEARCH_DEADLINE_MS = 300_000
+
+/**
+ * How long a run may gather and how wide its first wave is, chosen on the proposal card. `normal`
+ * is the five minutes above; `quick` is for the Free plan: four scouts, one per plan line, so no
+ * angle is dropped, and one fewer than `normal` against Browser Rendering's one request per ten
+ * seconds. `deep` buys rounds, and the card says what they cost. Rounds and requests keep their
+ * safety nets.
+ */
+export interface PresetLimits {
+  deadlineMs: number
+  scouts: number
+}
+
+export const RESEARCH_PRESETS: Record<ResearchPreset, PresetLimits> = {
+  quick: { deadlineMs: 120_000, scouts: 4 },
+  normal: { deadlineMs: RESEARCH_DEADLINE_MS, scouts: 5 },
+  deep: { deadlineMs: 600_000, scouts: 5 },
+}
+
+/** Absent means `normal`: a run started before presets existed, or a seeded one. */
+export function presetOf(state: Pick<ResearchState, 'preset'>): PresetLimits {
+  return RESEARCH_PRESETS[state.preset ?? 'normal']
+}
 
 /** Gap between rounds. Short enough to finish while the user still cares, long enough that a round
  *  which overran is not competing with its own successor. Counted in the headroom below. */
@@ -76,50 +101,6 @@ export const RESEARCH_MAX_ROUNDS = 12
  *  budget check keeps and as the charge a round takes before it starts. */
 export const ROUND_WORST_CASE = 50
 
-export type StopCause = 'time' | 'budget' | 'max-rounds' | 'no-new-ground' | 'model-done' | 'not-running'
-
-export interface ResearchState {
-  phase: 'proposed' | 'running' | 'done'
-  topic: string
-  /** What the run said it would look for, shown in the proposal and carried into round one. */
-  plan: string[]
-  /** Identifies this run across invocations; a round writes its result back only if this still
-   *  matches, so a stop that lands mid-round is not undone. Empty until the run starts. */
-  runId: string
-  /** Epoch milliseconds, zero until the run starts. Kept in state so the deadline survives the
-   *  alarm chain rather than restarting with each invocation. */
-  startedAt: number
-  /**
-   * One entry per round, appended and never rewritten. A single document rewritten each round
-   * keeps the prompt small but recompresses everything twelve times; the report is written once
-   * at the end from all of these instead, so each finding is compressed exactly once.
-   */
-  findings: string[]
-  /** A list, because in prose it stops being obvious what is still unanswered. */
-  openQuestions: string[]
-  /** Every URL this run has spent a request on, read or failed. Exact strings: deduplication
-   *  compares them, so they are never summarised. */
-  visited: string[]
-  /** How many of those actually produced content. The report counts pages, not attempts. */
-  read: number
-  /** Set when the run finishes. Held rather than sent so the user picks chat or a vault file: a
-   *  report is five minutes and a few hundred requests of work, not something a timer discards. */
-  report?: string
-  stopCause?: StopCause
-  spent: number
-  /** Kept apart from `spent` because it is drawn from the scouts' invocations, not this one's
-   *  budget. Reported, never gated on. */
-  scoutSpent?: number
-  round: number
-  /** Set by the first wave. Rounds after it go deep; without one the first two rounds are the
-   *  breadth pass instead. */
-  waved?: boolean
-  /** The longest round this run has finished, in milliseconds. Feeds the deadline's headroom. */
-  longestRoundMs?: number
-  foundNewUrls: boolean
-  modelDone: boolean
-}
-
 export interface RoundResult {
   /** What this round found, not a rewrite of the run so far. Empty when the round produced
    *  nothing usable — the caller appends nothing rather than appending a blank. */
@@ -127,12 +108,15 @@ export interface RoundResult {
   openQuestions: string[]
   /** Every URL a fetch was attempted on this round, whether or not it produced content. */
   urls: string[]
-  /** How many of `urls` produced content. */
-  read: number
+  /** Which of `urls` produced content. A list rather than a count so the run can dedupe it against
+   *  `visited`: two scouts reading the same cached page once showed "-2 could not be opened". */
+  readUrls: string[]
   /** URLs a search showed the round without it opening them. Grounds a citation the round made
    *  from a snippet, which is honest sourcing and must not read as an invention. */
   seenUrls?: string[]
   spent: number
+  /** Input plus output as the provider reported them, 0 where it reported nothing. */
+  tokens?: number
   modelDone?: boolean
 }
 
@@ -167,8 +151,14 @@ export function canPropose(state: ResearchState | undefined): boolean {
 }
 
 /** Moves a finished run to `done`, holding its report until the user says where it goes. */
-export function finishRun(state: ResearchState, stopCause: StopCause, report: string): ResearchState {
-  return { ...state, phase: 'done', stopCause, report }
+export function finishRun(state: ResearchState, stopCause: StopCause, report: string, tokens = 0): ResearchState {
+  return { ...state, phase: 'done', stopCause, report, tokens: addTokens(state.tokens, tokens) }
+}
+
+/** Zero reported is not the same as nothing reported: the field stays absent until a provider
+ *  has counted something, so the card shows no number rather than a wrong one. */
+function addTokens(sofar: number | undefined, more: number): number | undefined {
+  return more > 0 || sofar !== undefined ? (sofar ?? 0) + more : undefined
 }
 
 /**
@@ -224,7 +214,14 @@ export function shouldContinue(
   // Headroom, not elapsed: checked between rounds, "stop after five minutes" would mean "start a
   // round at 4:59 and finish at 7:30". Zero is a run that has not started, not one that began at
   // the epoch — without the guard it reads as expired before its first round.
-  if (state.startedAt && now + roundHeadroomMs(state) > state.startedAt + RESEARCH_DEADLINE_MS) {
+  //
+  // Never before the first round: the reservation is then the worst case, 210 s, which is more
+  // than `quick`'s whole deadline, and a run refused its first round ends "done" with nothing.
+  if (
+    state.round > 0 &&
+    state.startedAt &&
+    now + roundHeadroomMs(state) > state.startedAt + presetOf(state).deadlineMs
+  ) {
     return { go: false, reason: 'time' }
   }
   // Same shape for requests: a round may cost a whole invocation, so gating on what is already
@@ -256,10 +253,11 @@ export function chargeRound(state: ResearchState): ResearchState {
   return { ...state, round: state.round + 1, spent: state.spent + ROUND_WORST_CASE }
 }
 
-/** The widest a wave ever gets, and the same default LangChain's open_deep_research carries for
- *  `max_concurrent_research_units`. Not measured here: five scouts already read past the Free
- *  plan's browser concurrency, so a wider wave would be bounded by the platform, not by this. */
-export const MAX_SCOUTS = 5
+/** The widest a wave ever gets: the widest preset, which is also the default LangChain's
+ *  open_deep_research carries for `max_concurrent_research_units`. Not measured here: five scouts
+ *  already read past the Free plan's browser concurrency, so a wider wave would be bounded by the
+ *  platform, not by this. */
+export const MAX_SCOUTS = Math.max(...Object.values(RESEARCH_PRESETS).map((p) => p.scouts))
 
 /**
  * Every scout spends from its own invocation, so nothing in `RESEARCH_SUBREQUEST_BUDGET` bounds
@@ -282,7 +280,7 @@ export function waveAngles(state: ResearchState): string[] | undefined {
   if ((state.scoutSpent ?? 0) >= RESEARCH_SCOUT_BUDGET) {
     return undefined
   }
-  const width = MAX_SCOUTS - 2 * state.round
+  const width = presetOf(state).scouts - 2 * state.round
   if (width < 2) {
     return undefined
   }
@@ -290,7 +288,7 @@ export function waveAngles(state: ResearchState): string[] | undefined {
   return angles.length >= 2 ? angles : undefined
 }
 
-/** Exact strings, and deduplicated against the run as well as within the batch: `visited` is what
+/** Keys as given, deduplicated against the run as well as within the batch: `visited` is what
  *  `foundNewUrls` and the page count are both read from. */
 function freshUrls(state: ResearchState, urls: string[]): string[] {
   const fresh: string[] = []
@@ -313,7 +311,6 @@ function freshUrls(state: ResearchState, urls: string[]): string[] {
 export function applyWave(state: ResearchState, results: RoundResult[], ownSpend: number): ResearchState {
   const findings: string[] = []
   const openQuestions: string[] = []
-  let read = 0
   let scoutSpent = 0
   for (const result of results) {
     if (result.findings) {
@@ -324,19 +321,25 @@ export function applyWave(state: ResearchState, results: RoundResult[], ownSpend
         openQuestions.push(question)
       }
     }
-    read += result.read
     scoutSpent += result.spent
   }
   const fresh = freshUrls(
     state,
     results.flatMap((r) => r.urls),
   )
+  const freshRead = freshUrls(
+    state,
+    results.flatMap((r) => r.readUrls),
+  )
+  const tokens = results.reduce((n, r) => n + (r.tokens ?? 0), 0)
   return {
     ...state,
     findings: [...state.findings, ...findings],
     openQuestions,
     visited: [...state.visited, ...fresh],
-    read: state.read + read,
+    read: state.read + freshRead.length,
+    scouts: undefined,
+    tokens: addTokens(state.tokens, tokens),
     spent: state.spent + ownSpend,
     scoutSpent: (state.scoutSpent ?? 0) + scoutSpent,
     round: state.round + 1,
@@ -360,7 +363,8 @@ export function applyRound(state: ResearchState, result: RoundResult): ResearchS
     findings: result.findings ? [...state.findings, result.findings] : state.findings,
     openQuestions: result.openQuestions,
     visited: [...state.visited, ...fresh],
-    read: state.read + result.read,
+    read: state.read + freshUrls(state, result.readUrls).length,
+    tokens: addTokens(state.tokens, result.tokens ?? 0),
     spent: state.spent + result.spent,
     round: state.round + 1,
     foundNewUrls: fresh.length > 0,

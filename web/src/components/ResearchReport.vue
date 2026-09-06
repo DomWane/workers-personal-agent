@@ -13,6 +13,7 @@ import {
 import { MessageResponse } from '@/components/ai-elements/message'
 import { Source, Sources, SourcesContent, SourcesTrigger } from '@/components/ai-elements/sources'
 import { Button } from '@/components/ui/button'
+import { formatTokens } from '@/lib/context'
 import { pageCounts } from '@/lib/research'
 import type { ResearchState } from '@/types'
 
@@ -69,6 +70,7 @@ function hostOf(url: string): string {
           {{ pages.label }}
           <template v-if="pages.lost"> · {{ pages.lost }} could not be opened</template>
           <template v-if="why"> · {{ why }}</template>
+          <template v-if="props.research.tokens"> · {{ formatTokens(props.research.tokens) }} tokens</template>
         </ArtifactDescription>
       </div>
       <ArtifactActions>

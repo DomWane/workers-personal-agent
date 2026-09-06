@@ -221,8 +221,11 @@ describe('runCompactHistory', () => {
     }
 
     const prompt = (sent!.messages as { content: string }[])[0].content
-    expect(prompt).toContain('turn 7')
-    expect(prompt).not.toContain('turn 9')
+    // The head is the material and the tail is context, in that order: the summarizer sees what
+    // stays so it cannot call settled things pending. Mutation check: hand it `[]` and turn 9 is gone.
+    const tailAt = prompt.indexOf('keeps verbatim')
+    expect(prompt.indexOf('turn 7')).toBeLessThan(tailAt)
+    expect(prompt.indexOf('turn 9')).toBeGreaterThan(tailAt)
 
     const record = lines.map((l) => JSON.parse(l) as Record<string, unknown>).find((r) => r.at === 'compact')
     expect(record).toMatchObject({ context: CONTEXT, evicted: 8, kept: 2 })

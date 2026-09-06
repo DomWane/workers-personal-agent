@@ -1,8 +1,14 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { createMemoryStore } from '../../src/agent/memory/vault-store'
 import { PersonalAgent } from '../../src/agent/personal-agent'
-import { RESEARCH_DEADLINE_MS, RESEARCH_SUBREQUEST_BUDGET } from '../../src/agent/research-state'
+import {
+  proposeResearch,
+  RESEARCH_DEADLINE_MS,
+  RESEARCH_SUBREQUEST_BUDGET,
+  startResearch,
+} from '../../src/agent/research-state'
 import type { Env } from '../../src/types'
 import { requestBody } from '../helpers/request'
 import { listVault, readVault } from '../helpers/vault'
@@ -46,6 +52,48 @@ function queuePlan(lines = 'who publishes\nwhat they measure') {
 }
 
 describe('proposing a run', () => {
+  it('registers the thread under the topic, so a run started from the landing reaches the sidebar', async () => {
+    // Registration used to happen only on a chat message; a thread opened straight into research
+    // had none and was never listed. Mutation check: drop `registerThread` from the proposal.
+    const stub = await getAgentByName((env as Env).PERSONAL_AGENT, 'web:dev-user:home:proposed-first')
+    const { restore } = captureSends()
+    queuePlan()
+    try {
+      await runInDurableObject(stub, async (agent: PersonalAgent) => {
+        await agent.proposeResearch('agent eval trends')
+      })
+      const threads = await createMemoryStore(env as Env).listThreads()
+      expect(threads.find((t) => t.id === 'proposed-first')?.title).toBe('agent eval trends')
+    } finally {
+      restore()
+    }
+  })
+
+  it('says why a plan failed, not only that it did', async () => {
+    // A thread created from the landing ran on a model id the provider did not know, and "try
+    // again" was the whole notice. Mutation check: drop the reason from the emit and this fails.
+    const stub = await freshAgent()
+    const { sent, restore } = captureSends()
+    fetchMock
+      .get('https://llm.example')
+      .intercept({ method: 'POST', path: '/v1/chat/completions' })
+      .reply(
+        400,
+        { error: { message: '@cf/vendor/model is not a valid model ID' } },
+        { headers: { 'content-type': 'application/json' } },
+      )
+    try {
+      await runInDurableObject(stub, async (agent: PersonalAgent) => {
+        await agent.proposeResearch('agent eval trends')
+        expect(agent.state.research).toBeUndefined()
+      })
+      expect(sent.at(-1)).toContain('Could not plan that research: 400')
+      expect(sent.at(-1)).toContain('is not a valid model ID')
+    } finally {
+      restore()
+    }
+  })
+
   it('proposes without starting anything, and says it is working while it does', async () => {
     const stub = await freshAgent()
     const { sent, restore } = captureSends()
@@ -217,6 +265,35 @@ describe('/research plan', () => {
     expect(lines.map((l) => JSON.parse(l) as Record<string, unknown>)).toContainEqual(
       expect.objectContaining({ stage: 'plan-truncated', got: 6, kept: 4 }),
     )
+  })
+
+  it('keeps the preset the card chose on the run, and anything else as normal', async () => {
+    const stub = await freshAgent()
+    const { restore } = captureSends()
+    try {
+      await runInDurableObject(stub, async (agent: PersonalAgent) => {
+        const startWith = async (preset?: string) => {
+          queuePlan()
+          await agent.proposeResearch('agent eval trends')
+          await (preset === undefined ? agent.startResearch() : agent.startResearch(preset as never))
+          for (const s of await agent.listSchedules()) {
+            await agent.cancelSchedule(s.id)
+          }
+          const kept = agent.state.research?.preset
+          await agent.stopResearch()
+          return kept
+        }
+        expect(await startWith('deep')).toBe('deep')
+        expect(await startWith()).toBe('normal')
+        // Over RPC the argument is whatever the client sent. Mutation check: `in` instead of
+        // `hasOwn` and `toString` is kept as a preset, and every round then reads
+        // `presetOf(state).deadlineMs` off a function.
+        expect(await startWith('bogus')).toBe('normal')
+        expect(await startWith('toString')).toBe('normal')
+      })
+    } finally {
+      restore()
+    }
   })
 
   it('refuses once the run is going, rather than replanning under a round', async () => {
@@ -792,6 +869,113 @@ describe('runResearchRound', () => {
     }
   })
 
+  it('says it is writing while the report is written, and never on the finished state', async () => {
+    // The report call is unbounded by the deadline and has taken four minutes; the card said
+    // "Researching" throughout. Mutation checks: drop the `writing` setState and the first
+    // assertion is undefined; spread `this.state.research` into `finishRun` and the second fails.
+    const stub = await freshAgent()
+    const { restore } = captureSends()
+    queuePlan()
+    let inFlight: PersonalAgent | undefined
+    let writingSeen: boolean | undefined
+    fetchMock
+      .get('https://llm.example')
+      .intercept({ method: 'POST', path: '/v1/chat/completions' })
+      .reply(
+        200,
+        () => {
+          writingSeen = inFlight?.state.research?.writing
+          return { choices: [{ message: { content: 'Written.' } }] }
+        },
+        { headers: { 'content-type': 'application/json' } },
+      )
+    try {
+      await runInDurableObject(stub, async (agent: PersonalAgent) => {
+        await startRun(agent)
+        inFlight = agent
+        const started = agent.state.research as NonNullable<PersonalAgent['state']['research']>
+        agent.setState({
+          ...agent.state,
+          research: { ...started, findings: ['found'], startedAt: Date.now() - RESEARCH_DEADLINE_MS },
+        })
+        await agent.runResearchRound()
+
+        expect(writingSeen).toBe(true)
+        expect(agent.state.research).toMatchObject({ phase: 'done', report: 'Written.' })
+        expect(agent.state.research?.writing).toBeUndefined()
+        await agent.stopResearch()
+      })
+    } finally {
+      restore()
+    }
+  })
+
+  it('lets a stop landed during the report stand, rather than finishing over it', async () => {
+    // Four minutes with a Stop button under the card: a `done` written after the clear would put
+    // the stopped run back with a report attached. Mutation check: drop the `isCurrentRun` check
+    // in finishResearch.
+    const stub = await freshAgent()
+    const { restore } = captureSends()
+    queuePlan()
+    let inFlight: PersonalAgent | undefined
+    fetchMock
+      .get('https://llm.example')
+      .intercept({ method: 'POST', path: '/v1/chat/completions' })
+      .reply(
+        200,
+        () => {
+          inFlight?.setState({ ...inFlight.state, research: undefined })
+          return { choices: [{ message: { content: 'Written.' } }] }
+        },
+        { headers: { 'content-type': 'application/json' } },
+      )
+    try {
+      await runInDurableObject(stub, async (agent: PersonalAgent) => {
+        await startRun(agent)
+        inFlight = agent
+        const started = agent.state.research as NonNullable<PersonalAgent['state']['research']>
+        agent.setState({
+          ...agent.state,
+          research: { ...started, findings: ['found'], startedAt: Date.now() - RESEARCH_DEADLINE_MS },
+        })
+        await agent.runResearchRound()
+
+        expect(agent.state.research).toBeUndefined()
+        expect(await pending(agent)).toHaveLength(0)
+      })
+    } finally {
+      restore()
+    }
+  })
+
+  it('takes a scout’s running count only for the wave in flight', async () => {
+    // A scout from a run the user stopped, or a wave that already landed, must not write into
+    // whatever is running now. Mutation check: drop the run-id check and `b` reads 9.
+    const stub = await freshAgent()
+    await runInDurableObject(stub, async (agent: PersonalAgent) => {
+      const run = startResearch(proposeResearch('t', ['a', 'b']), 'r1') as NonNullable<
+        PersonalAgent['state']['research']
+      >
+      agent.setState({
+        ...agent.state,
+        research: {
+          ...run,
+          scouts: [
+            { angle: 'a', reads: 0, searches: 0 },
+            { angle: 'b', reads: 0, searches: 0 },
+          ],
+        },
+      })
+      await agent.scoutProgress('r1', 'a', { reads: 2, searches: 1 })
+      await agent.scoutProgress('old', 'b', { reads: 9, searches: 9 })
+      expect(agent.state.research?.scouts).toEqual([
+        { angle: 'a', reads: 2, searches: 1 },
+        { angle: 'b', reads: 0, searches: 0 },
+      ])
+      agent.setState({ ...agent.state, research: undefined })
+    })
+  })
+
   it('says out loud when a round cites a page the run never opened', async () => {
     // Findings are appended and never verified, so an invented source reaches the report looking
     // exactly like a read one.
@@ -1013,7 +1197,46 @@ describe('runResearchRound', () => {
     const files = await listVault('agent/research')
     expect(files).toHaveLength(1)
     expect(await readVault(files[0])).toContain('The written report.')
-    expect(sent.at(-1)).toMatch(/in memory as research\//i)
+    // Past tense: the reconcile is awaited before the message, so "reindexing" described a job
+    // that had already finished.
+    expect(sent.at(-1)).toMatch(/in memory as research\/.*can find it now/i)
+  })
+
+  it('shows the indicator while the index catches up, and says so when it cannot', async () => {
+    // The card leaves with the state and the reconcile takes seconds, so the save read as stuck;
+    // and a reconcile that threw left the state cleared with nothing said. Mutation checks: drop
+    // the `status: 'thinking'` and `seen` is undefined; drop the try/catch and the call rejects.
+    const stub = await freshAgent()
+    const { sent, restore } = captureSends()
+    queuePlan()
+    queueLlm(readCall('https://example.com/a'))
+    queueRead()
+    queueLlm({ content: '## Findings\nA finding worth keeping.\n\n## Done\nyes' })
+    queueLlm({ content: 'The written report.' })
+    try {
+      await runInDurableObject(stub, async (agent: PersonalAgent) => {
+        await startRun(agent)
+        await agent.runResearchRound()
+        let seen: string | undefined
+        agent.maintenance = () =>
+          ({
+            reconcile: async () => {
+              seen = agent.state.status
+              throw new Error('index down')
+            },
+          }) as never
+
+        await agent.saveResearch()
+
+        expect(seen).toBe('thinking')
+        expect(agent.state.status).toBeUndefined()
+        expect(agent.state.research).toBeUndefined()
+      })
+    } finally {
+      restore()
+    }
+    expect(await listVault('agent/research')).toHaveLength(1)
+    expect(sent.at(-1)).toMatch(/in memory as research\/.*nightly reindex will pick it up/i)
   })
 
   it('parks a finished run until it is saved, rather than filing it itself', async () => {

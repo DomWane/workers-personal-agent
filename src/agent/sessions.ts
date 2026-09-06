@@ -28,6 +28,10 @@ export async function summarizeHead(
   /** Already `spoken(...)`, and filtered by the caller before it *sized* this slice: filtering here
    *  instead would leave a slice chosen over rows this never reads, sometimes all of them. */
   evicted: HistoryMessage[],
+  /** The turns that stay, also `spoken(...)`. Shown so the summary cannot contradict them: from
+   *  the head alone, a research run whose finish sat in the tail was written up twice as
+   *  "proposed, the user has not responded". */
+  kept: HistoryMessage[],
 ): Promise<string> {
   const previous = previousSummary?.trim()
   const text = await chatCompletion(client, model, [
@@ -42,7 +46,14 @@ export async function summarizeHead(
         'New turns:',
         transcript(evicted),
         '',
-        'Write the updated summary: topics, decisions, durable facts about the user, open follow-ups. Plain text, no headings, no preamble.',
+        ...(kept.length
+          ? [
+              'The conversation continues with these turns, which the reader keeps verbatim. Do not summarize them; use them only so the summary does not describe as pending what they settle:',
+              transcript(kept),
+              '',
+            ]
+          : []),
+        'Write the updated summary of the new turns: topics, decisions, durable facts about the user. Past tense, plain text, no headings, no preamble. Call nothing pending, unanswered or open. Leave out passing trouble with tools or model switches unless it was still unresolved.',
       ].join('\n'),
     },
   ])

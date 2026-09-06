@@ -217,8 +217,9 @@ code.
 **Deep research.** A mode in the composer. The agent proposes a plan first, because a run costs
 minutes and hundreds of requests; then it works in rounds. A round with more than one angle fans out
 into one child Durable Object per angle, each with its own fifty subrequests and thirty seconds of
-CPU. A five-minute wall clock bounds the run, with the headroom for the last round measured rather
-than assumed.
+CPU. A wall clock bounds the run, five minutes by default and two or ten from the proposal card, with
+the headroom for the last round measured rather than assumed. A Tavily search brings every hit back
+with its whole page, so most reads in a wave cost no request at all.
 
 **Long-term memory.** Markdown in R2, with semantic recall over an embedding index in DO SQLite and
 a keyword path as fallback. The index is derived data keyed by the R2 etag, so an unchanged vault

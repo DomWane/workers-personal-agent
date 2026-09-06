@@ -1,5 +1,5 @@
-import type { ResearchState } from '../agent/research-state'
 import type { HistoryMessage } from './chat'
+import type { ResearchState } from './research'
 
 /** Durable Object state, one instance per thread. */
 export interface AgentState {

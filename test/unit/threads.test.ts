@@ -41,6 +41,25 @@ describe('the thread registry', () => {
     expect(threads[0]).toMatchObject({ id: 'notes', title: 'what did we decide about the vault?' })
   })
 
+  it('titles the thread from the first user turn, even after the agent has already spoken', async () => {
+    // A model picked on the landing reaches the new thread as a "Model switched" message before
+    // any turn. Mutation check: derive from `messages.length === 0` again and the title is empty.
+    const stub = await getAgentByName(testEnv.PERSONAL_AGENT, 'web:dev-user:home:switched')
+    await runInDurableObject(stub, async (agent: PersonalAgent) => {
+      agent.setState({
+        ...agent.state,
+        messages: [{ role: 'assistant', content: 'Model switched to x/y', id: 'm0', at: Date.now() }],
+      })
+      await agent.enqueueWebMessage('the real first question')
+      for (const s of await agent.listSchedules()) {
+        await agent.cancelSchedule(s.id)
+      }
+    })
+
+    const threads = await createMemoryStore(testEnv).listThreads()
+    expect(threads.find((t) => t.id === 'switched')?.title).toBe('the real first question')
+  })
+
   it('keeps the first title when the thread speaks again', async () => {
     const stub = await getAgentByName(testEnv.PERSONAL_AGENT, 'web:dev-user:home:keeps')
     await runInDurableObject(stub, async (agent: PersonalAgent) => {

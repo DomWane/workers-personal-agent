@@ -6,13 +6,8 @@ import {
   parseRoundOutput,
   ungroundedCitations,
 } from '../../src/agent/research-round'
-import {
-  RESEARCH_SUBREQUEST_BUDGET,
-  applyRound,
-  proposeResearch,
-  startResearch,
-  type ResearchState,
-} from '../../src/agent/research-state'
+import { RESEARCH_SUBREQUEST_BUDGET, applyRound, proposeResearch, startResearch } from '../../src/agent/research-state'
+import type { ResearchState } from '../../src/types'
 
 const running = (over: Partial<ResearchState> = {}): ResearchState => ({
   ...(startResearch(proposeResearch('agent eval trends', ['who publishes']), 'run-1') as ResearchState),
@@ -118,7 +113,7 @@ describe('buildRoundPrompt', () => {
       findings: 'what we know so far',
       openQuestions: ['is cost measured?'],
       urls: ['https://example.com/a'],
-      read: 1,
+      readUrls: ['https://example.com/a'],
       spent: 40,
     })
 
@@ -129,6 +124,12 @@ describe('buildRoundPrompt', () => {
     expect(prompt).toContain('is cost measured?')
     // Remaining, not spent: the model is being asked to decide how much more to do.
     expect(prompt).toContain(String(RESEARCH_SUBREQUEST_BUDGET - 40))
+  })
+
+  it('tells the model how long the preset leaves, not the five-minute constant', () => {
+    // A model told it has five minutes paces itself for five on a two-minute run. Mutation check:
+    // read RESEARCH_DEADLINE_MS again and this says 300.
+    expect(buildRoundPrompt(running({ preset: 'quick', startedAt: 0 }))).toContain('About 120 seconds')
   })
 
   it('tells the model which pages are already read so it does not re-fetch them', () => {
@@ -236,6 +237,11 @@ describe('ungroundedCitations', () => {
 
   it('does not blame a full stop for an unread page', () => {
     expect(ungroundedCitations('As shown at https://real.example/a.', ['https://real.example/a'])).toEqual([])
+    // A page read under one spelling and cited under another is the same page: twelve real pages
+    // were flagged in one round for a trailing slash. Mutation check: compare raw strings again.
+    expect(
+      ungroundedCitations('See https://real.example/a/ and https://real.example/a#top', ['https://real.example/a']),
+    ).toEqual([])
   })
 
   it('reports a repeated invention once', () => {

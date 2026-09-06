@@ -1,7 +1,10 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { getAgentByName } from 'agents'
 import { readArchive, sqlTag } from '../../src/agent/archive'
+import type { PersonalAgent } from '../../src/agent/personal-agent'
 import type { ResearchScout } from '../../src/agent/research-scout'
+import { proposeResearch, startResearch } from '../../src/agent/research-state'
 import type { Env } from '../../src/types'
 import { requestBody } from '../helpers/request'
 
@@ -96,6 +99,62 @@ describe('a scout files its reads in its own SQLite', () => {
       const page = sent.find((m) => m.role === 'tool')!
       expect(page.content.length).toBeLessThan(7_400)
       expect(page.content).toContain('read_tool_result(1)')
+    })
+  })
+})
+
+describe('a scout tells its parent how far it is', () => {
+  it('lands its counts in the parent state for the run in flight, over a real RPC', async () => {
+    // Mutation check: drop `onProgress` from the scout's deps, or `parent` from the input, and the
+    // parent's row stays at zero.
+    queueLlm({
+      content: null,
+      tool_calls: [
+        { id: 'c1', type: 'function', function: { name: 'read_page', arguments: '{"url":"https://x.example/a"}' } },
+      ],
+    })
+    fetchMock
+      .get(CF)
+      .intercept({ method: 'POST', path: '/client/v4/accounts/test-account/browser-rendering/markdown' })
+      .reply(200, { success: true, result: PAGE }, { headers: { 'content-type': 'application/json' } })
+    queueLlm({ content: NOTES })
+
+    const parentName = 'web:dev-user:home:wave-parent'
+    const parent = await getAgentByName(testEnv.PERSONAL_AGENT, parentName)
+    await runInDurableObject(parent, async (agent: PersonalAgent) => {
+      const run = startResearch(proposeResearch('agent evals', ['who publishes']), 'r1') as NonNullable<
+        PersonalAgent['state']['research']
+      >
+      agent.setState({
+        ...agent.state,
+        research: { ...run, scouts: [{ angle: 'who publishes', reads: 0, searches: 0 }] },
+      })
+    })
+
+    const stub = testEnv.RESEARCH_SCOUT.get(testEnv.RESEARCH_SCOUT.idFromName(`scout-${crypto.randomUUID()}`))
+    await runInDurableObject(stub as never, async (scout: ResearchScout) => {
+      const outcome = await scout.scout({
+        topic: 'agent evals',
+        angle: 'who publishes',
+        model: 'test-scout-model',
+        turnId: 't1',
+        alreadyTried: [],
+        contextTokens: 24_000,
+        parent: parentName,
+        runId: 'r1',
+      })
+      expect(outcome.error).toBeUndefined()
+    })
+
+    // The report is not awaited by the scout, so the parent is read until it has landed.
+    await expect
+      .poll(
+        () => runInDurableObject(parent, async (agent: PersonalAgent) => agent.state.research?.scouts?.[0]?.reads),
+        { timeout: 3000 },
+      )
+      .toBe(1)
+    await runInDurableObject(parent, async (agent: PersonalAgent) => {
+      agent.setState({ ...agent.state, research: undefined })
     })
   })
 })

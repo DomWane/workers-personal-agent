@@ -60,6 +60,7 @@ node scripts/seed-web-chat.mjs --scenario compact      # 10 long turns, nothing 
 node scripts/seed-web-chat.mjs --scenario threshold    # 20 turns on stub-small: the next turn compacts
 node scripts/seed-web-chat.mjs --scenario switch       # ~7k tokens: fits stub-large, not stub-small
 node scripts/seed-web-chat.mjs --scenario compacted    # already folded once
+node scripts/seed-web-chat.mjs --scenario settled      # research proposed in the head, finished in the tail: Compact must not call it pending
 node scripts/seed-web-chat.mjs --scenario chat         # the original UI tour: markdown, tools, research
 ```
 

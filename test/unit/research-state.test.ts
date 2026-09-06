@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   RESEARCH_MAX_ROUNDS,
   RESEARCH_DEADLINE_MS,
+  RESEARCH_PRESETS,
   ROUND_WORST_CASE_MS,
   RESEARCH_SCOUT_BUDGET,
   MIN_ROUND_HEADROOM_MS,
@@ -22,9 +23,9 @@ import {
   replan,
   shouldContinue,
   startResearch,
-  type ResearchState,
   type RoundResult,
 } from '../../src/agent/research-state'
+import type { ResearchState } from '../../src/types'
 
 const RUN = 'run-1'
 /** Measured over three real runs: 28, 31 and 32 subrequests for a round that used all six loop rounds. */
@@ -190,7 +191,7 @@ describe('shouldContinue', () => {
         findings: 'n',
         openQuestions: [],
         urls: [`https://x/${rounds}`],
-        read: 1,
+        readUrls: [`https://x/${rounds}`],
         spent: OBSERVED_ROUND_SPEND,
       })
     }
@@ -228,7 +229,7 @@ describe('chargeRound', () => {
   })
 
   it('is undone by applyRound, which charges the actual spend instead', () => {
-    const settled = applyRound(running, { findings: 'n', openQuestions: [], urls: [], read: 0, spent: 6 })
+    const settled = applyRound(running, { findings: 'n', openQuestions: [], urls: [], readUrls: [], spent: 6 })
 
     expect(settled.spent).toBe(6)
     expect(settled.round).toBe(1)
@@ -255,14 +256,14 @@ describe('applyRound', () => {
       findings: 'first pass',
       openQuestions: ['a'],
       urls: ['https://x'],
-      read: 1,
+      readUrls: ['https://x'],
       spent: 8,
     })
     const second = applyRound(first, {
       findings: 'second pass',
       openQuestions: [],
       urls: ['https://y'],
-      read: 1,
+      readUrls: ['https://y'],
       spent: 7,
     })
 
@@ -270,17 +271,23 @@ describe('applyRound', () => {
   })
 
   it('appends nothing when a round produced nothing usable', () => {
-    const after = applyRound(running, { findings: '', openQuestions: [], urls: [], read: 0, spent: 4 })
+    const after = applyRound(running, { findings: '', openQuestions: [], urls: [], readUrls: [], spent: 4 })
     expect(after.findings).toEqual([])
   })
 
   it('accumulates visited urls and spend, which are never summarised', () => {
-    const first = applyRound(running, { findings: 'n', openQuestions: [], urls: ['https://x'], read: 1, spent: 8 })
+    const first = applyRound(running, {
+      findings: 'n',
+      openQuestions: [],
+      urls: ['https://x'],
+      readUrls: ['https://x'],
+      spent: 8,
+    })
     const second = applyRound(first, {
       findings: 'n',
       openQuestions: [],
       urls: ['https://y', 'https://x'],
-      read: 2,
+      readUrls: ['https://y', 'https://x'],
       spent: 7,
     })
 
@@ -296,15 +303,28 @@ describe('applyRound', () => {
       findings: 'n',
       openQuestions: [],
       urls: ['https://x', 'https://x'],
-      read: 2,
+      readUrls: ['https://x', 'https://x'],
       spent: 8,
     })
     expect(after.visited).toEqual(['https://x'])
+    expect(after.read).toBe(1)
   })
 
   it('reports whether the round broke new ground', () => {
-    const first = applyRound(running, { findings: 'n', openQuestions: [], urls: ['https://x'], read: 1, spent: 8 })
-    const repeat = applyRound(first, { findings: 'n', openQuestions: [], urls: ['https://x'], read: 1, spent: 8 })
+    const first = applyRound(running, {
+      findings: 'n',
+      openQuestions: [],
+      urls: ['https://x'],
+      readUrls: ['https://x'],
+      spent: 8,
+    })
+    const repeat = applyRound(first, {
+      findings: 'n',
+      openQuestions: [],
+      urls: ['https://x'],
+      readUrls: ['https://x'],
+      spent: 8,
+    })
 
     expect(first.foundNewUrls).toBe(true)
     expect(repeat.foundNewUrls).toBe(false)
@@ -315,7 +335,7 @@ describe('applyRound', () => {
       findings: 'n',
       openQuestions: ['what about cost?'],
       urls: [],
-      read: 0,
+      readUrls: [],
       spent: 1,
     })
     expect(after.openQuestions).toEqual(['what about cost?'])
@@ -345,6 +365,15 @@ describe('waveAngles', () => {
     expect(waveAngles(running({ round: 2, openQuestions: questions(9) }))).toBeUndefined()
   })
 
+  it('starts four wide on quick, one per plan line, and still narrows by two', () => {
+    // Four is the most lines a plan holds, so no angle is dropped; at three the fourth angle went
+    // unscouted and the next round was not told. Mutation check: read a constant instead of the
+    // preset and the first is 5.
+    expect(waveAngles(running({ preset: 'quick', openQuestions: questions(9), plan: questions(9) }))).toHaveLength(4)
+    expect(waveAngles(running({ preset: 'quick', round: 1, openQuestions: questions(9) }))).toHaveLength(2)
+    expect(waveAngles(running({ preset: 'quick', round: 2, openQuestions: questions(9) }))).toBeUndefined()
+  })
+
   it('takes the ordinary round rather than a wave of one', () => {
     // One scout is the same work through a Durable Object, an RPC and a timeout.
     expect(waveAngles(running({ plan: ['who publishes'] }))).toBeUndefined()
@@ -369,7 +398,7 @@ describe('applyWave', () => {
     findings: 'f',
     openQuestions: [],
     urls: [],
-    read: 0,
+    readUrls: [],
     spent: 0,
     ...over,
   })
@@ -386,6 +415,30 @@ describe('applyWave', () => {
     expect(after.findings).toEqual(['a'])
   })
 
+  it('counts a page once however many scouts read it, so read never exceeds visited', () => {
+    // Cached pages are free, so two scouts on neighbouring angles both open the docs index: the
+    // first real quick run reported 37 read of 35 visited and the card said "-2 could not be
+    // opened". Mutation check: sum `read` again and this is 3 of 2.
+    const shared = scout({ urls: ['https://x', 'https://y'], readUrls: ['https://x', 'https://y'] })
+    const again = scout({ urls: ['https://x'], readUrls: ['https://x'] })
+    const after = applyWave(running(), [shared, again], 0)
+    expect(after.visited).toEqual(['https://x', 'https://y'])
+    expect(after.read).toBe(2)
+    // And a later round re-reading a visited page from the cache adds nothing either.
+    const later = applyRound(after, scout({ urls: ['https://x'], readUrls: ['https://x'] }))
+    expect(later.read).toBe(2)
+  })
+
+  it('sums what the scouts spent in tokens, and stays silent until a provider has counted', () => {
+    // Absent, not zero: a provider that omits `usage` would otherwise show a run as free. Mutation
+    // check: seed the sum with 0 and the second assertion reads 0.
+    const after = applyWave(running(), [scout({ tokens: 222_080 }), scout({ tokens: 180_000 })], 0)
+    expect(after.tokens).toBe(402_080)
+    expect(applyWave(running(), [scout(), scout({ tokens: 0 })], 0).tokens).toBeUndefined()
+    // The report's own call is the last thing added.
+    expect(finishRun(after, 'time', 'report', 5_000).tokens).toBe(407_080)
+  })
+
   it('charges the run only what this invocation spent, never what the scouts did', () => {
     // A scout spends from its own invocation's fifty. Folding it in would stop the depth rounds
     // early for money this budget never drew.
@@ -397,11 +450,15 @@ describe('applyWave', () => {
   it('merges the pages the scouts opened, counting an overlap once', () => {
     const after = applyWave(
       running(),
-      [scout({ urls: ['https://x', 'https://y'], read: 2 }), scout({ urls: ['https://y', 'https://z'], read: 2 })],
+      [
+        scout({ urls: ['https://x', 'https://y'], readUrls: ['https://x', 'https://y'] }),
+        scout({ urls: ['https://y', 'https://z'], readUrls: ['https://y', 'https://z'] }),
+      ],
       0,
     )
     expect(after.visited).toEqual(['https://x', 'https://y', 'https://z'])
-    expect(after.read).toBe(4)
+    // Three pages, not four reads: `y` was opened by both scouts and is one page.
+    expect(after.read).toBe(3)
     expect(after.foundNewUrls).toBe(true)
   })
 
@@ -452,13 +509,42 @@ describe('the deadline', () => {
     expect(startResearch(proposed(), RUN, 1000)?.startedAt).toBe(1000)
   })
 
+  it('reads the deadline from the preset, and absent is the five minutes', () => {
+    // A run started before presets existed carries none and must not become a two-minute one.
+    // Mutation check: read RESEARCH_DEADLINE_MS again and the deep run stops here too.
+    const started = 1_000_000
+    const pastNormal = started + RESEARCH_DEADLINE_MS - ROUND_WORST_CASE_MS + 1
+    // One round run, none timed: the clock counts and the reservation is still the worst case.
+    const afterOne = { round: 1 }
+    expect(shouldContinue(at(started, afterOne), pastNormal)).toEqual({ go: false, reason: 'time' })
+    expect(shouldContinue(at(started, { ...afterOne, preset: 'deep' }), pastNormal)).toEqual({ go: true })
+    expect(
+      shouldContinue(at(started, { ...afterOne, preset: 'quick' }), started + RESEARCH_PRESETS.quick.deadlineMs),
+    ).toEqual({ go: false, reason: 'time' })
+  })
+
+  it('always runs the first round, whatever the preset', () => {
+    // The reservation before any round is the worst case, 210 s, and quick's whole deadline is
+    // 120 s: with the clock checked at round zero the run ended "done" with nothing gathered, on
+    // the first real try. Mutation check: drop the `round > 0` guard and quick fails here.
+    const started = 1_000_000
+    expect(RESEARCH_PRESETS.quick.deadlineMs).toBeLessThan(ROUND_WORST_CASE_MS)
+    expect(shouldContinue(at(started, { preset: 'quick' }), started)).toEqual({ go: true })
+    // And after one round of the length production measured, quick is that one wave and the report.
+    expect(
+      shouldContinue(at(started, { preset: 'quick', round: 1, longestRoundMs: 70_000 }), started + 70_000),
+    ).toEqual({ go: false, reason: 'time' })
+  })
+
   it('keeps a whole round of headroom rather than stopping on elapsed time', () => {
     // Checked between rounds, "stop after five minutes" would mean starting a round at 4:59 and
     // finishing at 7:30.
+    // Round 1 with no duration recorded: a round has run, so the clock counts, and the
+    // reservation is still the worst case.
     const started = 1_000_000
     const latest = started + RESEARCH_DEADLINE_MS - ROUND_WORST_CASE_MS
-    expect(shouldContinue(at(started), latest)).toEqual({ go: true })
-    expect(shouldContinue(at(started), latest + 1)).toEqual({ go: false, reason: 'time' })
+    expect(shouldContinue(at(started, { round: 1 }), latest)).toEqual({ go: true })
+    expect(shouldContinue(at(started, { round: 1 }), latest + 1)).toEqual({ go: false, reason: 'time' })
   })
 
   it('outranks every other cap, because it is the only one meant to fire', () => {
@@ -500,7 +586,7 @@ describe('roundHeadroomMs', () => {
   })
 
   it('lets a run that proved itself quick fit more rounds in', () => {
-    const quick = recordRoundDuration(running({ spent: 10, foundNewUrls: true }), 70_000)
+    const quick = recordRoundDuration(running({ spent: 10, foundNewUrls: true, round: 1 }), 70_000)
     const at200s = 1000 + 200_000
     expect(shouldContinue(quick, at200s)).toEqual({ go: true })
     // The constant would have refused this round at 151 s and ended the run with half the clock left.

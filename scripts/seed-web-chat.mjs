@@ -174,8 +174,36 @@ const bulk = (n, extra = {}) => {
   }
 }
 
+/**
+ * A research run proposed in the head and finished in the tail. A forced compaction keeps only the
+ * last exchange, so the summarizer's material ends at the proposal and the finish is in what it is
+ * shown as context: the summary must not say the run is still waiting on the user.
+ */
+const settledTurns = () => [
+  msg('user', 'Research Cloudflare Durable Objects: real use cases and the limits that bite.'),
+  msg(
+    'assistant',
+    'I would look for:\n1. websockets and real-time multiplayer state patterns\n2. transactional consistency and storage limits with SQLite\n3. coordination versus sharding once one object is too hot\n4. cold starts, latency and pricing against Fly Machines or Redis\n\nStart it, revise the plan, or drop it.',
+  ),
+  msg('user', 'While that runs: what does a scout cost on the Free plan?'),
+  msg(
+    'assistant',
+    'A scout spends from its own fifty subrequests and its own neurons; four scouts reading in parallel share the one-request-per-ten-seconds Browser Rendering limit, so some reads fall back to Firecrawl.',
+  ),
+  msg('user', 'Save it into memory.'),
+  msg(
+    'assistant',
+    '🔎 Cloudflare Durable Objects: real use cases and the limits that bite — done.\n1 rounds, 27 pages read of 30 tried, 16201 characters.\n\nIn memory as research/2026-09-06-cloudflare-durable-objects.md — indexed, search_memory can find it now.',
+  ),
+]
+
 const scenarios = {
   chat: chatState,
+  settled: (() => {
+    const messages = settledTurns()
+    const chars = messages.reduce((sum, m) => sum + m.content.length, 0)
+    return { messages, channel: { kind: 'web' }, promptTokens: Math.ceil(chars / 3) }
+  })(),
   // Short answers with one plainly wrong: something to disagree with, so the rating and its note
   // have a reason to exist rather than being clicked at random.
   feedback: {

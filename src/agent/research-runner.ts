@@ -1,14 +1,14 @@
 import type OpenAI from 'openai'
 import { buildRoundPrompt, parseRoundOutput, type RoundOutput } from './research-round'
-import { MAX_SCOUTS, SCOUT_TIMEOUT_MS, type ResearchState, type RoundResult } from './research-state'
+import { MAX_SCOUTS, SCOUT_TIMEOUT_MS, type RoundResult } from './research-state'
 import type { SubrequestBudget } from './subrequest-budget'
 import { runToolLoop } from './tool-loop'
 import { browserTools } from './tools/browser.tools'
 import { searchTools } from './tools/search.tools'
 import { readToolResultTool } from './tools/tool-archive.tools'
-import type { ToolContext } from './tools/registry'
+import { pageKey, type ToolContext } from './tools/registry'
 import type { TurnLog } from './log'
-import type { ChatMessage } from '../types'
+import type { ChatMessage, ResearchState, ScoutCounts } from '../types'
 
 /**
  * One round: search, read, and rewrite the notes. The rewrite is the loop's *final answer*
@@ -47,7 +47,10 @@ const REPORT_PROMPT =
   'ending every sentence with a bare URL. Keep every source. Prefer losing repetition to losing a ' +
   'fact, and write no preamble about what you are doing.'
 
-export async function writeResearchReport(state: ResearchState, deps: Omit<RoundDeps, 'ctx'>): Promise<string> {
+export async function writeResearchReport(
+  state: ResearchState,
+  deps: Omit<RoundDeps, 'ctx'>,
+): Promise<{ text: string; tokens: number }> {
   const res = await deps.client.chat.completions.create({
     model: deps.model,
     messages: [
@@ -59,8 +62,15 @@ export async function writeResearchReport(state: ResearchState, deps: Omit<Round
     ],
   })
   const text = (res.choices[0]?.message?.content ?? '').trim()
-  deps.log?.event({ at: 'research', stage: 'report-written', rounds: state.findings.length, chars: text.length })
-  return text
+  const tokens = (res.usage?.prompt_tokens ?? 0) + (res.usage?.completion_tokens ?? 0)
+  deps.log?.event({
+    at: 'research',
+    stage: 'report-written',
+    rounds: state.findings.length,
+    chars: text.length,
+    tokens,
+  })
+  return { text, tokens }
 }
 
 /**
@@ -120,6 +130,9 @@ export interface RoundDeps {
   /** A scout's prompt, which is built from one angle rather than from the run's state. Everything
    *  after the prompt — the loop, the parse, the write-up retry — is the same work. */
   prompt?: string
+  /** Called after every search and read with the running counts, so a scout can tell its parent
+   *  what it is doing before the wave lands. */
+  onProgress?: (counts: ScoutCounts) => void
 }
 
 export interface ScoutOutcome extends RoundResult {
@@ -129,7 +142,17 @@ export interface ScoutOutcome extends RoundResult {
 }
 
 export function emptyOutcome(angle: string, error: string): ScoutOutcome {
-  return { angle, findings: '', openQuestions: [], urls: [], seenUrls: [], read: 0, spent: 0, error }
+  return {
+    angle,
+    findings: '',
+    openQuestions: [],
+    urls: [],
+    seenUrls: [],
+    readUrls: [],
+    spent: 0,
+    tokens: 0,
+    error,
+  }
 }
 
 async function withTimeout(work: Promise<ScoutOutcome>): Promise<ScoutOutcome> {
@@ -198,11 +221,13 @@ async function askForWriteUp(messages: ChatMessage[], deps: RoundDeps, prompt: s
 
 export async function runResearchRound(state: ResearchState, deps: RoundDeps): Promise<RoundResult> {
   const urls: string[] = []
+  const readUrls: string[] = []
   const seenUrls: string[] = []
   const emptyQueries: string[] = []
-  let read = 0
+  let searches = 0
+  const report = () => deps.onProgress?.({ reads: readUrls.length, searches })
   const log = deps.log ?? deps.ctx.log
-  const { text, messages, toolsUsed } = await runToolLoop({
+  const { text, messages, toolsUsed, tokensSpent } = await runToolLoop({
     client: deps.client,
     model: deps.model,
     systemPrompt: ROUND_PROMPT,
@@ -212,23 +237,33 @@ export async function runResearchRound(state: ResearchState, deps: RoundDeps): P
     tools: [...searchTools, ...browserTools, ...(deps.ctx.toolArchive ? [readToolResultTool] : [])],
     ctx: {
       ...deps.ctx,
+      // Keyed like the cache: `/docs` and `/docs/` are one page in `visited` too, or the run counts
+      // them twice and re-buys the second.
       onPageRead: (url, ok) => {
-        urls.push(url)
+        const key = pageKey(url)
+        urls.push(key)
         if (ok) {
-          read++
+          readUrls.push(key)
         }
+        report()
       },
       onSearchResults: (found, query) => {
+        searches++
         if (!found.length) {
           emptyQueries.push(query)
         }
         for (const url of found) {
-          if (!seenUrls.includes(url)) {
-            seenUrls.push(url)
+          const key = pageKey(url)
+          if (!seenUrls.includes(key)) {
+            seenUrls.push(key)
           }
         }
+        report()
       },
-      alreadyTried: (url) => state.visited.includes(url) || urls.includes(url),
+      // One round's worth, like `urls`: a search and the reads it prompts land in the same
+      // invocation, and a page kept across rounds would be a second archive with its own staleness.
+      pageCache: new Map(),
+      alreadyTried: (url) => state.visited.includes(pageKey(url)) || urls.includes(pageKey(url)),
       log,
     },
     subrequests: deps.budget,
@@ -270,7 +305,7 @@ export async function runResearchRound(state: ResearchState, deps: RoundDeps): P
   // Nothing opened and nothing even offered by a search: whatever the model wrote came out of its
   // own memory, and passing it on would put unsourced prose in the report beside researched text.
   // Snippets alone still count — a claim cited from a search result is honest sourcing.
-  const grounded = read > 0 || seenUrls.length > 0
+  const grounded = readUrls.length > 0 || seenUrls.length > 0
   if (!grounded && parsed?.findings) {
     log?.event({ at: 'research', stage: 'ungrounded-round', chars: parsed.findings.length })
   }
@@ -281,8 +316,9 @@ export async function runResearchRound(state: ResearchState, deps: RoundDeps): P
     openQuestions: parsed?.openQuestions ?? state.openQuestions,
     urls,
     seenUrls,
-    read,
+    readUrls,
     spent: deps.budget?.spent ?? 0,
+    tokens: tokensSpent,
     modelDone: parsed?.modelDone ?? false,
   }
 }

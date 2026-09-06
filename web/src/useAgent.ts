@@ -1,7 +1,7 @@
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
 import { AgentClient } from 'agents/client'
 import { toast } from './useToasts'
-import type { AgentState } from './types'
+import type { AgentState, ResearchPreset } from './types'
 
 /** How long a not-yet-open socket gets before an RPC gives up on it. A handshake, not a call: the
  *  slow ones — a compaction runs tens of seconds — are on a socket that is already open, which is
@@ -122,7 +122,7 @@ export function useAgent(thread: Ref<string>, closed: Ref<string | null>) {
   const research = {
     propose: (topic: string) => rpc('proposeResearch', [topic], 'The research was not proposed'),
     revise: (note: string) => rpc('revisePlan', [note], 'The plan was not revised'),
-    start: () => rpc('startResearch', [], 'The research did not start'),
+    start: (preset: ResearchPreset) => rpc('startResearch', [preset], 'The research did not start'),
     stop: () => rpc('stopResearch', [], 'The research was not stopped'),
     save: () => rpc('saveResearch', [], 'The report was not saved'),
   }

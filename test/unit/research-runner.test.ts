@@ -2,13 +2,8 @@ import { fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createLlmClient } from '../../src/connectors/llm.connector'
 import { runResearchRound, runScoutWave, writeResearchReport, type ScoutOutcome } from '../../src/agent/research-runner'
-import {
-  MAX_SCOUTS,
-  applyRound,
-  proposeResearch,
-  startResearch,
-  type ResearchState,
-} from '../../src/agent/research-state'
+import { MAX_SCOUTS, applyRound, proposeResearch, startResearch } from '../../src/agent/research-state'
+import type { ResearchState } from '../../src/types'
 import { SubrequestBudget } from '../../src/agent/subrequest-budget'
 import type { ToolArchive, ToolContext } from '../../src/agent/tools/registry'
 import type { ToolResultRecord } from '../../src/agent/archive'
@@ -201,7 +196,7 @@ describe('runResearchRound', () => {
     })
 
     expect(result.urls).toEqual(['https://example.com/dead'])
-    expect(result.read).toBe(0)
+    expect(result.readUrls).toEqual([])
   })
 
   it('charges the round for what it actually spent', async () => {
@@ -310,7 +305,10 @@ describe('runResearchRound', () => {
         200,
         (opts) => {
           asked = requestBody(opts)
-          return { choices: [{ message: { content: 'the written report' } }] }
+          return {
+            choices: [{ message: { content: 'the written report' } }],
+            usage: { prompt_tokens: 1200, completion_tokens: 300 },
+          }
         },
         { headers: { 'content-type': 'application/json' } },
       )
@@ -322,9 +320,58 @@ describe('runResearchRound', () => {
       budget,
     })
 
-    expect(out).toBe('the written report')
+    expect(out.text).toBe('the written report')
+    // The one call of a run that is not a tool loop, so its usage is read here or lost.
+    expect(out.tokens).toBe(1500)
     expect(asked).toContain('round one found A')
     expect(asked).toContain('round two found B')
+  })
+
+  it('reports its running counts as it goes, and keys every url the way the cache does', async () => {
+    // The counts are what a scout sends its parent mid-wave. The key is what keeps `/a/` and `/a`
+    // from being two visited pages. Mutation checks: drop `onProgress` and the list is empty; store
+    // the raw url and `urls` carries the slash.
+    queuePageRead('https://example.com/a/')
+    queueLlm({ content: NOTES })
+    const budget = new SubrequestBudget()
+    const progress: { reads: number; searches: number }[] = []
+
+    const result = await runResearchRound(running(), {
+      client: createLlmClient('k', `${BASE}/v1`, budget.fetch),
+      model: 'm',
+      ctx: ctxFor(budget),
+      budget,
+      onProgress: (p) => progress.push({ ...p }),
+    })
+
+    expect(progress).toEqual([{ reads: 1, searches: 0 }])
+    expect(result.urls).toEqual(['https://example.com/a'])
+    expect(result.readUrls).toEqual(['https://example.com/a'])
+  })
+
+  it('reports what the round spent, as the provider counted it', async () => {
+    // Mutation check: drop `tokens` from the result and the card has nothing to sum.
+    fetchMock
+      .get(BASE)
+      .intercept({ method: 'POST', path: '/v1/chat/completions' })
+      .reply(
+        200,
+        {
+          choices: [{ message: { content: '## Findings\nCovered.\n\n## Done\nyes' } }],
+          usage: { prompt_tokens: 900, completion_tokens: 100 },
+        },
+        { headers: { 'content-type': 'application/json' } },
+      )
+    const budget = new SubrequestBudget()
+
+    const result = await runResearchRound(running(), {
+      client: createLlmClient('k', `${BASE}/v1`, budget.fetch),
+      model: 'm',
+      ctx: ctxFor(budget),
+      budget,
+    })
+
+    expect(result.tokens).toBe(1000)
   })
 
   it('carries the model verdict through when it says it is done', async () => {
@@ -348,7 +395,7 @@ describe('runScoutWave', () => {
     findings: `f:${angle}`,
     openQuestions: [],
     urls: [],
-    read: 0,
+    readUrls: [],
     spent: 0,
     ...over,
   })
@@ -458,7 +505,7 @@ describe('a round with nothing to source from', () => {
 
     expect(result.findings).toBe('From the snippet.')
     expect(result.seenUrls).toEqual(['https://found.example/x'])
-    expect(result.read).toBe(0)
+    expect(result.readUrls).toEqual([])
   })
 
   it('names the queries that came back empty, since a count cannot say which', async () => {

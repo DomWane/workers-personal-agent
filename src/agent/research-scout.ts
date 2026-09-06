@@ -6,11 +6,10 @@ import { PRUNE_OVER_CHARS } from './tool-loop'
 import { MAX_PAGE_CHARS } from './tools/browser.tools'
 import { createLlmClient } from '../connectors/llm.connector'
 import { llmConfig } from './llm-config'
-import type { Env } from '../types'
-import { contentEnabled, createLog, errorFields } from './log'
+import type { Env, ResearchState, ScoutCounts } from '../types'
+import { contentEnabled, createLog, errorFields, type TurnLog } from './log'
 import { buildScoutPrompt } from './research-round'
 import { emptyOutcome, runResearchRound, type ScoutOutcome } from './research-runner'
-import type { ResearchState } from './research-state'
 import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from './subrequest-budget'
 import { cachedSubrequestLimit } from './workers-plan'
 
@@ -36,6 +35,9 @@ export interface ScoutInput {
    * a chat turn — a scout has no overflow retry, so a request over the window loses the angle.
    */
   contextTokens?: number
+  /** Who to tell about progress, and which run it belongs to. Absent, the scout works silently. */
+  parent?: string
+  runId?: string
 }
 
 /** The scout reuses the round machinery whole — only the prompt differs — so the parse, the
@@ -64,6 +66,7 @@ export class ResearchScout extends DurableObject<Env> {
   /** A scout is short-lived and named per run, so this is asked once per instance and never reused
    *  — the hour of cache in `workers-plan.ts` is what keeps a wave from asking five times. */
   private planLimit = FREE_PLAN_SUBREQUESTS
+  private progressFailed = false
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -74,6 +77,21 @@ export class ResearchScout extends DurableObject<Env> {
 
   private budget(): SubrequestBudget {
     return new SubrequestBudget(this.planLimit)
+  }
+
+  /** Not awaited: an internal call, out of the thousand rather than the fifty, and a report that
+   *  fails must cost the angle nothing, so the first failure is logged and the rest are dropped. */
+  private tellParent(input: ScoutInput, counts: ScoutCounts, log: TurnLog): void {
+    if (!input.parent || !input.runId) {
+      return
+    }
+    const parent = this.env.PERSONAL_AGENT.get(this.env.PERSONAL_AGENT.idFromName(input.parent))
+    void parent.scoutProgress(input.runId, input.angle, counts).catch((err: unknown) => {
+      if (!this.progressFailed) {
+        this.progressFailed = true
+        log.error({ at: 'research', stage: 'progress-failed', angle: input.angle, error: errorFields(err) })
+      }
+    })
   }
 
   private llm(budget: SubrequestBudget): OpenAI {
@@ -108,12 +126,13 @@ export class ResearchScout extends DurableObject<Env> {
         budget,
         log,
         prompt: buildScoutPrompt(input.topic, input.angle, input.alreadyTried),
+        onProgress: (progress) => this.tellParent(input, progress, log),
       })
       log.event({
         at: 'research',
         stage: 'scout-done',
         angle: input.angle,
-        reads: result.read,
+        reads: result.readUrls.length,
         urls: result.urls.length,
         findingsChars: result.findings.length,
         subrequests: budget.spent,

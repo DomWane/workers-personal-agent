@@ -50,7 +50,7 @@ angle still returns findings, and the pruner is simply mute for the whole run.
 production wave logged `SqlError: SQL query failed: internal error` in the same second the wave
 closed. Four scouts, 57 subrequests and four angles of findings were discarded: the clear in the
 `catch` was the next write and failed too, the rejection escaped the handler, the Agents SDK kept
-the schedule row, and the retried alarm ran an ordinary round over the state written *before* the
+the schedule row, and the retried alarm ran an ordinary round over the state written _before_ the
 round. The evidence is in the next round's record: `spent: 70` is `chargeRound`'s 50 plus that
 round's 20, and `rounds: 1` where a wave of four should have left four. Both writes now go through
 `retryOnce`, and the clear has its own `catch` so a failure there can no longer take the handler
@@ -61,7 +61,7 @@ with it.
 after the wave had closed, with their pages paid for and thrown away. A test ties the constant to
 that measurement.
 
-**A round that could not have sourced anything has its findings dropped.** No page opened *and* no
+**A round that could not have sourced anything has its findings dropped.** No page opened _and_ no
 search result seen means whatever the model wrote came out of its own memory, and the report is
 written from these entries beside researched text. Two scouts on the first real run did exactly that
 — zero pages, two thousand characters each. A snippet alone still counts, because a claim cited from
@@ -112,7 +112,7 @@ Action**, limited on the Free plan to one request every ten seconds; the 3-concu
 opens.
 
 **A citation the run never saw is logged, not removed.** `ungroundedCitations` compares the URLs in a
-round's findings against `visited` *and the URLs searches put in front of the model*, so the check
+round's findings against `visited` _and the URLs searches put in front of the model_, so the check
 needs no model and no network. Grounding on `visited` alone flagged seventeen citations in one round
 of the first real run, and every one was a real page a search had returned and the round had chosen
 not to open. The check exists because findings are appended and never verified and the report is
@@ -124,7 +124,7 @@ because dropping them quietly would read as clean while losing real citations to
 A research run keeps one entry per round in `findings`, appended and never rewritten, and the
 report is written from all of them in one call at the end. The first design rewrote a single
 `notes` document every round, which put every early finding through twelve compressions; this puts
-each through one. `FINDINGS_SHOWN` bounds only what a round is *shown* — nothing shown there is the
+each through one. `FINDINGS_SHOWN` bounds only what a round is _shown_ — nothing shown there is the
 only copy.
 
 **The request budget is derived from the round cap, not set beside it.** A round measured 28, 31
@@ -139,8 +139,54 @@ is a different product from a job they come back to, and what buys the shortness
 covers the breadth a sequential agent spends rounds on. No competitor's figure is cited for it,
 because it is a judgement and a citation would only make it look derived.
 
+**The proposal card offers three lengths, and the preset rides on the run.** `quick` is two
+minutes and four scouts, `normal` the five minutes and five above, `deep` ten minutes and five.
+The width and the deadline are read from `state.preset` by every round of the alarm chain, so a run
+cannot change shape halfway; absent means `normal`, which is what a run started before presets
+existed or a seeded one gets. `quick` exists for the Free plan: one scout fewer against Browser
+Rendering's one request per ten seconds, and a fifth fewer neurons for the same landscape. It
+started at three, which was a guess, and the guess had a cost: a plan holds up to four angles,
+and the fourth was never scouted and the next round was never told. Raised to four once the search
+cache served 17 of 31 reads without a fetch, which halved what a scout asks of the rate limit.
+In practice it is one wave and the report, because a round measured at 70 s plus the
+headroom for another does not fit twice in two minutes. **The first round is never refused for
+time**: before any round has run the headroom is the worst case, 210 s, which is more than
+`quick`'s whole deadline, and the first real `quick` run ended "done" with nothing gathered because
+the clock was checked at round zero. A run that has not gathered anything has nothing to report,
+so the deadline starts counting against the second round. **The clock bounds the reading, and the
+card says so**: writing the report took 91 s, 239 s and 172 s on the first three `quick` runs
+(deepseek flash through OpenRouter, 13k to 17k characters out; the times are the gap between the
+`wave` and `report-written` records in the dev log, since `report-written` carries no duration of
+its own), each longer than the two minutes the card had promised, with the card still saying
+"Researching". The preset copy now reads "Reads for up to 2 minutes … then writes the report", and
+`state.writing` turns the card's title into "Writing the report" for that stretch. A stop pressed
+during that stretch stands: `finishResearch` checks `isCurrentRun` before it writes `done`, or the
+report would put the stopped run back.
+
+**The wave reports as it goes.** A wave's two minutes showed the card nothing but zeros, because the
+scouts run in their own Durable Objects and the parent wrote state once, when the wave landed. The
+parent now writes one `scouts` row per angle before the wave starts, and each scout calls the
+parent's `scoutProgress` after every search and read with its running counts: an internal call,
+out of the thousand rather than the fifty, not awaited, and dropped after the first failure so a
+report that cannot land costs the angle nothing. Keyed by run id, so a scout from a stopped run
+changes nothing. `applyWave` clears the rows; the card shows them while they exist. `deep` says on the card what it costs — on Workers AI Free a ten-minute run is a large share of
+the day's 10,000 neurons, a figure not yet measured because nothing sums `cf-ai-neurons` across a
+run — because that is where the run is approved, and a warning in the README is not read at that
+moment. The request and round caps are unchanged: they are safety nets
+under the deadline, and a preset only moves the deadline.
+
+**A run carries what it cost, in the providers' own count.** Every round and every scout returns
+the tool loop's `tokensSpent`, the report call adds its `usage`, and the sum rides on
+`state.tokens` for the status card and the finished report's summary line. The plan call is not
+counted: it is one short call before the run exists. A provider that reports no `usage` leaves the
+field absent, so the card shows no number rather than a free-looking zero. The first `quick` run
+measured this way: one scout's `done` record carried `tokensSpent: 222080` after 57 s on deepseek
+flash, three whole runs came to 516k, 548k and 536k. At the catalogue's $0.045 per million that is
+about three cents a run there; on Workers AI Free it would be a large share of the day's neurons,
+unmeasured.
+
 **Four caps bound a run, and only one of them is meant to fire.** The order in `shouldContinue` is
-the hierarchy: the five-minute deadline is the hard bound, requests and rounds are safety nets under
+the hierarchy: the deadline (five minutes on `normal`) is the hard bound, requests and rounds are safety nets under
 it that a ~150 s round should never reach, and the two judgements — `no-new-ground`, then
 `model-done` — come last. The deadline keeps a whole round of headroom, because "stop after five
 minutes" checked between rounds otherwise means starting a round at 4:59 and finishing at 7:30. The
@@ -169,7 +215,7 @@ be true at once and never said which fired first.
 **The composer's toggle is the only way to start a run, and the model has no say.** A
 `deep_research` tool that let the model propose a run was tried and removed, because the judgement
 it asked for — is this ask worth minutes and hundreds of requests — went wrong in both directions:
-silent on *"Research companies using Cloudflare"* against a description that opened with
+silent on _"Research companies using Cloudflare"_ against a description that opened with
 **REQUIRED**, and the same latitude would have proposed runs nobody wanted. What the toggle gives up
 is discoverability: a user who does not know it exists will not be told. That is the trade, and it
 is one line of system prompt to undo if it starts to matter.
