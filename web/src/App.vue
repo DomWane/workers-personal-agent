@@ -149,8 +149,15 @@ async function onSubmit(message: PromptInputMessage): Promise<void> {
   if (asResearch) {
     mode.value = 'chat'
   }
+  // The landing is its own Durable Object, so a model picked there was written to it and not to
+  // the thread this message is about to create. Carried over by hand, or the first turn runs on
+  // the deployment default and the pick reads as ignored.
+  const picked = current.value === LANDING ? state.value.modelOverride : undefined
   if (current.value === LANDING) {
     create()
+  }
+  if (picked) {
+    await setModel(picked)
   }
   await (asResearch ? run.propose(text) : say(text))
   await refresh()
