@@ -35,6 +35,7 @@ import MessageFeedback from '@/components/MessageFeedback.vue'
 import ModelPicker from '@/components/ModelPicker.vue'
 import ModePicker from '@/components/ModePicker.vue'
 import ThemePicker from '@/components/ThemePicker.vue'
+import SettingsDialog from '@/components/SettingsDialog.vue'
 import ThreadSidebar from '@/components/ThreadSidebar.vue'
 import Toaster from '@/components/Toaster.vue'
 import ResearchProposal from '@/components/ResearchProposal.vue'
@@ -249,6 +250,7 @@ const showReport = computed(() => research.value?.phase === 'done' && !!research
           :title="connected ? 'Connected' : 'Disconnected'"
         />
         <div class="ml-auto flex items-center gap-2">
+          <SettingsDialog />
           <ThemePicker />
         </div>
       </header>
