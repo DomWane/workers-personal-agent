@@ -29,6 +29,27 @@ signal. Both directions measured 2026-08-23: policy on, the chat answers; policy
 Taking the signed-in email would rename every Durable Object and strand its history. Access decides
 who may reach the agent, not whose agent it is.
 
+## The thread registry is a file in the vault
+
+**Decision.** `agent/threads.json` holds `{ id, title, at }` per thread. Written by
+`touchThread` on every message, `renameThread` and `removeThread`, each a read-modify-write under
+an R2 etag; read by the Worker for `/api/threads`, by the nightly cron and by the citation check.
+**Why.** A Durable Object namespace cannot be enumerated, so the list has to live somewhere, and
+`localStorage` was rejected as silent data loss: a cleared browser leaves every thread alive and
+unreachable. Four readers with no single owner made the vault the cheapest place: it already
+existed, R2 through a binding spends no subrequest (measured 2026-08-06), and D1 would be a binding
+for one file.
+**Limits, recorded 2026-09-07.** Every write rewrites the whole file and every read reads it, so
+thousands of threads are fine and tens of thousands are not. An etag conflict throws and is not
+retried: two first messages in the same instant leave one thread registered by its next message,
+without a title. There is no query, only the list.
+**Alternatives, in order of change.** A retry loop on the conflict plus one file per folder;
+rows in a Durable Object (the `index` instance every thread already calls, or a registry of its
+own, which is the shape the MCP registry takes); D1, the answer once there is more than one user;
+KV, rejected because `list()` is eventually consistent and a new thread would lag in the sidebar.
+Nothing moves until there is a second user or a folder, and then it moves by one import of this
+file.
+
 ## Clients call RPCs and never write state
 
 SDK connections are read-only, and `client.call` requires the `@callable` decorator. Slash commands
