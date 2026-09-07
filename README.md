@@ -26,6 +26,10 @@ platform limit it runs into is measured and written down.
   the oldest turns fold into a rolling summary, and go to an append-only archive first.
 - **Tool results that outlive their round.** A fetched page is kept whole in the thread's SQLite;
   only the copy inside the request is cut, so a later turn can read the rest.
+- **Skills the agent writes for itself.** A workflow that took several tool calls is offered as a
+  skill, saved as markdown in the vault, and listed in every system prompt; the model reads the
+  procedure when a request matches, and `/slug` invokes one by hand. Unused ones are archived after
+  90 days.
 - **Scheduled work.** Reminders, recurring tasks, a nightly reflection pass over memory and index
   reconciliation, all Durable Object alarms, none inside a chat turn.
 - **Several conversations**, listed in a sidebar and registered in the vault, so a cleared browser
@@ -74,6 +78,8 @@ provider is one var and one secret, see Configuration.
 - **"Remember that I write my notes in Czech."** — `save_memory`, or the profile when a fact changes
   the shape of most answers.
 - **"Remind me at nine tomorrow to send the invoice."** — a Durable Object alarm.
+- **"Save that as a skill called Daily digest"** after a search-and-summarise turn — `save_skill`.
+  Next time, "give me the daily digest" or `/daily-digest` follows the saved procedure.
 - **Toggle Deep research in the composer and type a topic** — a plan card with Start, Revise and
   Drop, then a status card that updates as the scouts work.
 - **"What did that article say about pricing?"** — `search_tool_results` over the pages this thread
