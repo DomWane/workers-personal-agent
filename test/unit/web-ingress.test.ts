@@ -24,6 +24,11 @@ async function takeSchedules(agent: PersonalAgent, callback: string) {
   return pending
 }
 
+/** Keeps the schedule row and disarms the alarm behind it, so a turn the test runs by hand is not
+ *  run a second time by the SDK after the test has returned. */
+const disarmAlarm = (agent: PersonalAgent) =>
+  (agent as unknown as { ctx: DurableObjectState }).ctx.storage.deleteAlarm()
+
 function replyOnce(content: string, capture?: (body: string) => void) {
   fetchMock
     .get('https://llm.example')
@@ -61,8 +66,8 @@ describe('the indicator against the row the turn is running from', () => {
       const [scheduled] = (await agent.listSchedules()).filter((s) => s.callback === 'processWebMessage')
       const payload = scheduled.payload as WebMessagePayload
 
-      // Deliberately *not* cancelled first: the row has to be there, the way it is when the SDK
-      // hands the callback its turn.
+      // The row stays, the way it is when the SDK hands the callback its turn.
+      await disarmAlarm(agent)
       await agent.processWebMessage(payload)
       expect(agent.state.status).toBeUndefined()
 
@@ -79,6 +84,7 @@ describe('the indicator against the row the turn is running from', () => {
       const queued = (await agent.listSchedules()).filter((s) => s.callback === 'processWebMessage')
       expect(queued).toHaveLength(2)
 
+      await disarmAlarm(agent)
       await agent.processWebMessage(queued[0].payload as WebMessagePayload)
       // Mutation check: drop the exclusion entirely and this goes undefined — "done" with the
       // second question unanswered.
