@@ -578,6 +578,55 @@ popup, eating into the OAuth code's short lifetime. Walk that against a real ser
 actually connected; the local example server's `mcp-worker-authenticated` variant covers the flow
 without one.
 
+### 8c. A skill the model picks on its own — and a schedule list that tells the truth
+
+Two things the suite cannot judge: whether a real model, shown the skill index in its prompt,
+reaches for `read_skill` instead of improvising; and whether R2 outside the simulator returns
+`customMetadata` from `list`, which is what makes that index one call. This one needs a real
+`LLM_MODEL`, since the stub never chooses a tool.
+
+```bash
+pnpm build:web
+# LLM_BASE_URL and the key come from .env; ENVIRONMENT=localhost opens /dev/chat. The deployment's
+# LLM_MODEL is a Workers AI id, so name one the .env provider actually serves.
+npx wrangler dev --local --var LLM_MODEL:deepseek/deepseek-v4-flash
+```
+
+`/dev/chat` is enough for the whole walk; the browser adds nothing here.
+
+```bash
+chat() { curl -s localhost:8787/dev/chat -H 'content-type: application/json' \
+  -d "{\"text\":$(jq -Rn --arg t "$1" '$t'),\"thread\":\"${2:-skills-$RANDOM}\"}"; echo; }
+
+chat 'Save a skill named "Daily digest": description "Morning summary of AI news, three items". Procedure: 1. web_search "AI news today" 2. pick three items 3. one line each with the source. Pitfalls: never invent a headline.'
+```
+
+- the reply confirms a save, and the Worker log for that turn shows `toolsUsed: ["save_skill"]`
+- **the index is one call:** the *next* turn's log has no `list_skills` in it, and a
+  `wrangler r2 object get personal-agent-vault/agent/skills/daily-digest.md --pipe` shows the
+  frontmatter the metadata was copied from. Miniflare honours `include` too, so the local run
+  proves the plumbing; only a `--remote` run proves the production bucket does the same
+- **the model picks it unprompted:** in a *new* thread, `chat 'give me the daily digest'` with no
+  slash. The turn's `toolsUsed` starts with `read_skill`, then `web_search`, and the answer is three
+  items with sources. A model that answers from recall instead of calling `read_skill` is the
+  failure this section exists to catch; note the model, because that is a model-quality result
+- **the slash form stamps use:** `chat '/daily-digest only two items'` in another new thread. The
+  reply follows the procedure with two items, and the skill file now carries `use_count: 2` and
+  today's `last_used` (the unprompted turn counted as the first)
+- **schedules hide the agent's own alarms:** `chat 'remind me tomorrow at 9 to review the digest'`
+  then, in the same thread, `chat 'what do I have scheduled?'`. Exactly one line comes back, the
+  reminder. A `task:` line with nothing after it would be the turn's own `processWebMessage`
+  alarm leaking through, which is the regression `userSchedules` guards. Finish with
+  `chat 'cancel it'` and the reminder is gone from a third listing
+
+Walked on 2026-09-07 against `deepseek/deepseek-v4-flash` over OpenRouter. The save turn used
+`save_skill` alone and the file landed with `use_count: 0`. The unprompted turn ran five rounds,
+`toolsUsed` starting `read_skill, web_search, read_page…`, no `list_skills` anywhere in the log,
+and answered with three sourced items; the file read `use_count: 1`. The slash turn gave two items
+and left `use_count: 2`. The reminder needed one extra turn, since the model asked for a timezone
+before scheduling; the listing then returned exactly one `reminder:` line, cancel removed it, and
+the last listing was `(nothing scheduled)`.
+
 ## Cleaning up
 
 The seeded threads are real Durable Objects and stay in `agent/threads.json` until deleted. Delete
