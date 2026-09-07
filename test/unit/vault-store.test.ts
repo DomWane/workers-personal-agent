@@ -3,16 +3,18 @@ import { slugify } from '../../src/agent/memory/vault-format'
 import { VaultStore, sanitize } from '../../src/agent/memory/vault-store'
 import type { VaultBackend } from '../../src/agent/memory/vault-store'
 
-function fakeBackend(files: Record<string, { content: string; sha: string }>) {
+function fakeBackend(files: Record<string, { content: string; sha: string; meta?: Record<string, string> }>) {
   return {
     getFile: vi.fn(async (path: string) => files[path] ?? null),
-    putFile: vi.fn(async (path: string, content: string, _msg: string, _sha?: string) => {
-      files[path] = { content, sha: `sha-${path}` }
-    }),
+    putFile: vi.fn(
+      async (path: string, content: string, _msg: string, _sha?: string, meta?: Record<string, string>) => {
+        files[path] = { content, sha: `sha-${path}`, ...(meta ? { meta } : {}) }
+      },
+    ),
     listDir: vi.fn(async (path: string) =>
       Object.keys(files)
         .filter((p) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes('/'))
-        .map((p) => ({ name: p.slice(path.length + 1), sha: files[p].sha })),
+        .map((p) => ({ name: p.slice(path.length + 1), sha: files[p].sha, meta: files[p].meta })),
     ),
     deleteFile: vi.fn(async (path: string) => {
       delete files[path]
@@ -365,6 +367,36 @@ describe('VaultStore.archiveMemory', () => {
   it('reports not found without touching anything', async () => {
     const store = new VaultStore(fakeBackend({}), 'agent')
     await expect(store.archiveMemory('nope')).resolves.toBe('error: memory not found: nope')
+  })
+})
+
+describe('the skill index comes from object metadata', () => {
+  it('saveSkill writes the frontmatter as metadata, and listSkills reads it without opening files', async () => {
+    // Mutation check: drop the `e.meta?.name` branch in `listSkills` and getFile is called once.
+    const vault = fakeBackend({})
+    const store = new VaultStore(vault, 'agent', '2026-09-07')
+    await store.saveSkill({ name: 'Daily digest', description: 'AI news', content: 'body' })
+    expect(vault.putFile.mock.calls[0][4]).toMatchObject({ name: 'Daily digest', description: 'AI news' })
+
+    vault.getFile.mockClear()
+    const skills = await store.listSkills()
+    expect(skills).toMatchObject([{ slug: 'daily-digest', description: 'AI news', useCount: 0 }])
+    expect(vault.getFile).not.toHaveBeenCalled()
+  })
+
+  it('opens a skill file that carries no metadata, so a hand-written skill is still listed', async () => {
+    const vault = fakeBackend({ 'agent/skills/daily-digest.md': { content: SKILL_FILE, sha: 's1' } })
+    const skills = await new VaultStore(vault, 'agent').listSkills()
+    expect(skills).toMatchObject([{ slug: 'daily-digest', name: 'Daily digest' }])
+    expect(vault.getFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the metadata current through a use stamp', async () => {
+    const vault = fakeBackend({})
+    const store = new VaultStore(vault, 'agent', '2026-09-07')
+    await store.saveSkill({ name: 'Daily digest', description: 'AI news', content: 'body' })
+    await store.readSkill('daily-digest')
+    expect((await store.listSkills())[0]).toMatchObject({ useCount: 1, lastUsed: '2026-09-07' })
   })
 })
 

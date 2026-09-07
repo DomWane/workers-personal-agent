@@ -1,3 +1,5 @@
+import type { VaultEntry, VaultMeta } from '../agent/memory/vault-store'
+
 export class R2VaultConnector {
   constructor(private bucket: R2Bucket) {}
 
@@ -9,21 +11,29 @@ export class R2VaultConnector {
     return { content: await obj.text(), sha: obj.etag }
   }
 
-  async putFile(path: string, content: string, _message: string, sha?: string): Promise<void> {
-    const res = await this.bucket.put(path, content, sha ? { onlyIf: { etagMatches: sha } } : undefined)
+  async putFile(path: string, content: string, _message: string, sha?: string, meta?: VaultMeta): Promise<void> {
+    const res = await this.bucket.put(path, content, {
+      onlyIf: sha ? { etagMatches: sha } : undefined,
+      customMetadata: meta,
+    })
     if (sha && res === null) {
       throw new Error(`r2 putFile conflict: ${path} changed since it was read`)
     }
   }
 
-  async listDir(path: string): Promise<{ name: string; sha: string }[]> {
+  async listDir(path: string): Promise<VaultEntry[]> {
     const prefix = `${path}/`
-    const out: { name: string; sha: string }[] = []
+    const out: VaultEntry[] = []
     let cursor: string | undefined
     do {
-      const page = await this.bucket.list({ prefix, delimiter: '/', cursor })
+      const page = await this.bucket.list({
+        prefix,
+        delimiter: '/',
+        cursor,
+        include: ['customMetadata'],
+      } as R2ListOptions)
       for (const obj of page.objects) {
-        out.push({ name: obj.key.slice(prefix.length), sha: obj.etag })
+        out.push({ name: obj.key.slice(prefix.length), sha: obj.etag, meta: obj.customMetadata })
       }
       cursor = page.truncated ? page.cursor : undefined
     } while (cursor)

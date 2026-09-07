@@ -37,7 +37,7 @@ export const skillTools: ToolDef[] = [
       'Save or update a reusable workflow as a skill. Structure content as: ## When to Use / ## Procedure / ## Pitfalls / ## Verification. Reuse the same name to update.',
     params: z.object({
       name: z.string().describe('Short stable title, e.g. "Daily AI news digest"'),
-      description: z.string().describe('One line: what task this skill handles'),
+      description: z.string().max(120).describe('One line: what task this skill handles'),
       content: z.string().describe('The skill body (markdown, template above)'),
     }),
     handler: (args, ctx) => createMemoryStore(ctx.env).saveSkill(args),

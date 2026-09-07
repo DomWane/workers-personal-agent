@@ -40,10 +40,18 @@ export function sanitize(s: string): string {
   return s.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '')
 }
 
+export type VaultMeta = Record<string, string>
+
+export interface VaultEntry {
+  name: string
+  sha: string
+  meta?: VaultMeta
+}
+
 export interface VaultBackend {
   getFile(path: string): Promise<{ content: string; sha: string } | null>
-  putFile(path: string, content: string, message: string, sha?: string): Promise<void>
-  listDir(path: string): Promise<{ name: string; sha: string }[]>
+  putFile(path: string, content: string, message: string, sha?: string, meta?: VaultMeta): Promise<void>
+  listDir(path: string): Promise<VaultEntry[]>
   deleteFile(path: string, message: string, sha: string): Promise<void>
 }
 
@@ -316,13 +324,12 @@ export class VaultStore implements MemoryStore {
       fm.pinned = 'true'
     }
 
-    await this.vault.putFile(
-      this.skillPath(slug),
-      renderSkillFile(fm, sanitize(entry.content).trim()),
-      `skill: ${slug}`,
-      existing?.sha,
-    )
+    await this.putSkill(this.skillPath(slug), fm, sanitize(entry.content).trim(), `skill: ${slug}`, existing?.sha)
     return existing ? `updated skill "${slug}"` : `saved skill "${slug}"`
+  }
+
+  private putSkill(path: string, fm: Record<string, string>, body: string, message: string, sha?: string) {
+    return this.vault.putFile(path, renderSkillFile(fm, body), message, sha, fm)
   }
 
   async listSkills(): Promise<SkillMeta[]> {
@@ -335,6 +342,9 @@ export class VaultStore implements MemoryStore {
     const metas = await Promise.all(
       mdFiles.map(async (e) => {
         const slug = e.name.replace(/\.md$/, '')
+        if (e.meta?.name) {
+          return toSkillMeta(slug, e.meta)
+        }
         const f = await this.vault.getFile(this.skillPath(slug))
         return f ? toSkillMeta(slug, parseFrontmatter(f.content).fm) : null
       }),
@@ -359,7 +369,7 @@ export class VaultStore implements MemoryStore {
     const meta = toSkillMeta(slug, fm)
     try {
       const stamped = { ...fm, use_count: String(meta.useCount + 1), last_used: this.todayStr() }
-      await this.vault.putFile(this.skillPath(slug), renderSkillFile(stamped, body), `skill use: ${slug}`, f.sha)
+      await this.putSkill(this.skillPath(slug), stamped, body, `skill use: ${slug}`, f.sha)
     } catch (err) {
       console.error('[vault-store] skill stamp failed', err)
     }
