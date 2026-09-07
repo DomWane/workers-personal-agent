@@ -8,7 +8,7 @@ const mode = defineModel<ChatMode>({ required: true })
 
 const MODES: Array<{ id: ChatMode; label: string; hint: string }> = [
   { id: 'chat', label: 'Chat', hint: 'One turn, tools as needed' },
-  { id: 'research', label: 'Deep research', hint: 'Plan, then rounds of scouts — minutes, not seconds' },
+  { id: 'research', label: 'Deep research', hint: 'A plan, then rounds of scouts. Takes minutes, not seconds.' },
 ]
 </script>
 

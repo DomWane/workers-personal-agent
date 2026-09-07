@@ -100,7 +100,7 @@ export function useAgent(thread: Ref<string>, closed: Ref<string | null>) {
       await Promise.race([ready, new Promise((resolve) => setTimeout(resolve, HANDSHAKE_MS))])
     }
     if (!connected.value) {
-      toast(`${what}. Not connected to the agent — check that it is running, then try again.`)
+      toast(`${what}. Not connected to the agent. Check that it is running, then try again.`)
       return false
     }
     try {

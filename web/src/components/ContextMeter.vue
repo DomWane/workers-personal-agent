@@ -22,7 +22,7 @@ const title = computed(() =>
   [
     `${usage.value.tokens.toLocaleString()} tokens`,
     props.window ? `of ${props.window.toLocaleString()}` : '(model window unknown)',
-    usage.value.measured ? '— counted by the provider' : '— estimated, no turn has reported yet',
+    usage.value.measured ? '(counted by the provider)' : '(estimated, no turn has reported yet)',
     due.value ? '· over the compaction threshold' : '',
   ].join(' '),
 )

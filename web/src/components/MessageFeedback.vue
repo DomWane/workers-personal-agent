@@ -74,7 +74,7 @@ const undo = () => void send('none')
       variant="ghost"
       class="size-7 p-0 text-foreground"
       :aria-label="chosen === 'up' ? 'Undo good answer' : 'Undo bad answer'"
-      :title="`You marked this ${chosen === 'up' ? 'a good' : 'a bad'} answer — click to take it back`"
+      :title="`You marked this ${chosen === 'up' ? 'a good' : 'a bad'} answer. Click to take it back.`"
       @click="undo"
     >
       <component :is="chosen === 'up' ? ThumbsUpIcon : ThumbsDownIcon" class="size-3.5" />
@@ -89,7 +89,7 @@ const undo = () => void send('none')
         variant="ghost"
         class="size-7 p-0 text-muted-foreground"
         :aria-label="r === 'up' ? 'Good answer' : 'Bad answer'"
-        :title="r === 'up' ? 'Good answer' : 'Bad answer — the nightly pass may use this as evidence'"
+        :title="r === 'up' ? 'Good answer' : 'Bad answer. The nightly pass may use this as evidence.'"
         @click="pick(r)"
       >
         <component :is="r === 'up' ? ThumbsUpIcon : ThumbsDownIcon" class="size-3.5" />
@@ -103,7 +103,7 @@ const undo = () => void send('none')
       v-model="note"
       autofocus
       class="h-7 max-w-80 text-xs"
-      placeholder="What was wrong? (optional — Enter to save)"
+      placeholder="What was wrong? Optional, Enter saves"
       aria-label="What was wrong with this answer"
       @blur="commit"
       @keydown.enter.prevent="commit"
