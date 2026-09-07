@@ -400,15 +400,19 @@ async function executeTool(
     return 'error: invalid arguments (not valid JSON)'
   }
 
-  const parsed = tool.params.safeParse(raw)
-  if (!parsed.success) {
-    return `error: invalid arguments\n${z.prettifyError(parsed.error)}`
+  let args: unknown = raw
+  if (!tool.schema) {
+    const parsed = tool.params.safeParse(raw)
+    if (!parsed.success) {
+      return `error: invalid arguments\n${z.prettifyError(parsed.error)}`
+    }
+    args = parsed.data
   }
 
   let timer: ReturnType<typeof setTimeout>
   try {
     return await Promise.race([
-      tool.handler(parsed.data as never, ctx),
+      tool.handler(args as never, ctx),
       new Promise<string>((_, reject) => {
         timer = setTimeout(() => reject(new Error('tool timed out')), tool.timeoutMs ?? timeoutMs)
       }),

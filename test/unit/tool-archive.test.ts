@@ -14,7 +14,7 @@ const testEnv = env as Env
 const tool = (name: string): ToolDef => toolArchiveTools.find((t) => t.name === name)!
 
 function run(def: ToolDef, args: unknown, ctx: ToolContext): Promise<string> {
-  return def.handler(def.params.parse(args) as never, ctx)
+  return def.handler(def.params!.parse(args) as never, ctx)
 }
 
 /**

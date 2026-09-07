@@ -11,6 +11,17 @@ hands the handler the cron string or `Date` that `Agent.schedule` overloads on.
 optional. A wrong type is now a tool result the model can fix, not `[object Object]` in the vault.
 **Cost.** Specs are generated per `runToolLoop`: 0.085 ms for nineteen tools.
 
+## An MCP tool carries its server's schema instead
+
+**Decision.** A `ToolDef` has either `params` (zod, every native tool) or `schema` (raw JSON
+Schema, every MCP tool), and the type makes both or neither unrepresentable. `toolSpec` sends
+`schema` verbatim; `executeTool` skips the parse for it and hands the model's JSON to the handler.
+**Why.** The rule above exists so the schema shown and the schema parsed cannot drift. An MCP
+server owns both halves already: it published the schema and it validates the call. A zod
+round-trip over a third-party schema would add a translation between the two, which is the drift
+the rule was written against. Results still pass `fileAndTrim` and every cap below.
+**Rejected.** Converting `inputSchema` to zod for a local parse.
+
 ## What happens to a result after the handler returns
 
 ```

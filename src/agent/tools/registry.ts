@@ -48,18 +48,20 @@ export interface ScheduleInfo {
   type: string
 }
 
-export interface ToolDef {
+interface ToolBase {
   name: string
   description: string
-  params: z.ZodType
   handler(args: never, ctx: ToolContext): Promise<string>
   timeoutMs?: number
   maxResultChars?: number
   noArchive?: boolean
 }
 
+export type ToolDef = ToolBase &
+  ({ params: z.ZodType; schema?: never } | { params?: never; schema: Record<string, unknown> })
+
 export function defineTool<S extends z.ZodType>(
-  def: Omit<ToolDef, 'params' | 'handler'> & {
+  def: Omit<ToolBase, 'handler'> & {
     params: S
     handler: (args: z.infer<S>, ctx: ToolContext) => Promise<string>
   },
@@ -68,8 +70,13 @@ export function defineTool<S extends z.ZodType>(
 }
 
 export function toolSpec(tool: ToolDef) {
-  const { $schema: _unused, ...parameters } = z.toJSONSchema(tool.params, { io: 'input' }) as Record<string, unknown>
+  const parameters = tool.schema ? tool.schema : zodParameters(tool.params)
   return { type: 'function' as const, function: { name: tool.name, description: tool.description, parameters } }
+}
+
+function zodParameters(params: z.ZodType): Record<string, unknown> {
+  const { $schema: _unused, ...rest } = z.toJSONSchema(params, { io: 'input' }) as Record<string, unknown>
+  return rest
 }
 
 export const recoverableAt = (ref: number, note: string) => `[kept whole as ref ${ref}; ${note}]`

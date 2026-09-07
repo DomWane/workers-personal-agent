@@ -5,7 +5,14 @@ import { ARCHIVE_MIN_CHARS } from '../../src/agent/tool-loop'
 import { buildTools } from '../../src/agent/tools'
 import { MAX_PAGE_CHARS } from '../../src/agent/tools/browser.tools'
 import type { CitationVerdict } from '../../src/agent/provenance'
-import { DEFAULT_RESULT_CHARS, pageKey, type ScheduleInfo, type ToolContext } from '../../src/agent/tools/registry'
+import {
+  DEFAULT_RESULT_CHARS,
+  pageKey,
+  toolSpec,
+  type ScheduleInfo,
+  type ToolContext,
+  type ToolDef,
+} from '../../src/agent/tools/registry'
 import { MAX_SCHEDULED_TASKS } from '../../src/agent/tools/schedule.tools'
 import type { Env } from '../../src/types'
 import { readVault, seedVault } from '../helpers/vault'
@@ -28,8 +35,8 @@ const tools: Record<
   buildTools().map((t) => [
     t.name,
     {
-      params: t.params,
-      handler: (args: Record<string, unknown>, ctx: ToolContext) => t.handler(t.params.parse(args) as never, ctx),
+      params: t.params!,
+      handler: (args: Record<string, unknown>, ctx: ToolContext) => t.handler(t.params!.parse(args) as never, ctx),
     },
   ]),
 )
@@ -1023,5 +1030,40 @@ describe('search_tool_results', () => {
     const out = await tools.search_tool_results.handler({ query: 'text' }, finding(0))
     expect(out).toContain('use web_search or read_page')
     expect(out).not.toContain('more match')
+  })
+})
+
+describe('passthrough schema tools (MCP)', () => {
+  const MCP_SCHEMA = {
+    type: 'object',
+    properties: { query: { type: 'string' } },
+    required: ['query'],
+    additionalProperties: false,
+  }
+
+  const passthrough: ToolDef = {
+    name: 'files_search',
+    description: 'searches the files server',
+    schema: MCP_SCHEMA,
+    handler: async (args: never) => `found ${(args as { query?: string }).query ?? 'nothing'}`,
+  }
+
+  it('sends the server schema to the model verbatim, zod untouched', () => {
+    expect(toolSpec(passthrough).function.parameters).toEqual(MCP_SCHEMA)
+  })
+
+  it('falls back to the zod schema when no passthrough schema is set', () => {
+    // Mutation check: make `toolSpec` read `schema` unconditionally and every native tool's
+    // parameters on the wire collapse to `undefined`, which no turn test would catch.
+    const native: ToolDef = {
+      name: 'echo',
+      description: 'echoes',
+      params: z.object({ text: z.string().optional() }),
+      handler: async (args: never) => `echo:${(args as { text?: string }).text ?? ''}`,
+    }
+    expect(toolSpec(native).function.parameters).toMatchObject({
+      type: 'object',
+      properties: { text: { type: 'string' } },
+    })
   })
 })

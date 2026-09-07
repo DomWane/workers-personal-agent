@@ -1140,3 +1140,39 @@ describe('what the turn leaves in history', () => {
     expect(persisted.every((m) => m.id.length > 0)).toBe(true)
   })
 })
+
+describe('a passthrough schema tool (MCP) executes what the schema would refuse', () => {
+  const passthrough = {
+    name: 'files_echo',
+    description: 'echoes on the files server',
+    schema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+    handler: async (args: never) => `echo:${(args as { text?: string }).text}`,
+  } as ToolDef
+
+  it('rides the server schema on the wire and skips zod, leaving validation to the server', async () => {
+    // Mutation check: route schema tools through `params.safeParse` again and `{"text":5}` (valid
+    // JSON, wrong per the schema) is refused before the handler — the tool result is an error
+    // string instead of `echo:5`, and the model never sees the number the server would answer with.
+    let first: Record<string, unknown> | undefined
+    let second: Record<string, unknown> | undefined
+    queueResponse(
+      {
+        content: null,
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'files_echo', arguments: '{"text":5}' } }],
+      },
+      (b) => (first = b),
+    )
+    queueResponse({ content: 'done' }, (b) => (second = b))
+
+    const out = await loop([passthrough])
+    expect(out).toMatchObject({ text: 'done', toolsUsed: ['files_echo'], roundsUsed: 2 })
+
+    const wire = ((first?.tools ?? []) as { function: { name: string; parameters: unknown } }[]).find(
+      (t) => t.function.name === 'files_echo',
+    )
+    expect(wire?.function.parameters).toEqual(passthrough.schema)
+
+    const msgs = second?.messages as { role: string; tool_call_id?: string; content: string }[]
+    expect(msgs.at(-1)).toMatchObject({ role: 'tool', tool_call_id: 'c1', content: 'echo:5' })
+  })
+})
