@@ -794,6 +794,28 @@ describe('schedule tools', () => {
   it('list_scheduled reports when empty', async () => {
     await expect(tools.list_scheduled.handler({}, makeCtx())).resolves.toBe('(nothing scheduled)')
   })
+
+  it("hides the agent's own alarms from the list and refuses to cancel them", async () => {
+    // Mutation check: drop the callback filter in `userSchedules` and the running turn's row
+    // lists as an empty task and is cancellable by id.
+    const cancelSchedule = vi.fn(async () => true)
+    const ctx = makeCtx({
+      agent: {
+        schedule: vi.fn(async () => ({ id: 's' })),
+        listSchedules: vi.fn(async (): Promise<ScheduleInfo[]> => [
+          { id: 'turn', callback: 'processWebMessage', payload: { text: 'hi' }, time: 1783500000, type: 'delayed' },
+          { id: 'digest', callback: 'runTask', payload: { prompt: 'digest' }, time: 1783500000, type: 'cron' },
+        ]),
+        cancelSchedule,
+      },
+    })
+    const listed = await tools.list_scheduled.handler({}, ctx)
+    expect(listed).toContain('digest')
+    expect(listed).not.toContain('turn')
+    await expect(tools.cancel_scheduled.handler({ id: 'turn' }, ctx)).resolves.toMatch(/not found/)
+    expect(cancelSchedule).not.toHaveBeenCalled()
+    await expect(tools.cancel_scheduled.handler({ id: 'digest' }, ctx)).resolves.toMatch(/cancelled/)
+  })
 })
 
 describe('skill tools', () => {

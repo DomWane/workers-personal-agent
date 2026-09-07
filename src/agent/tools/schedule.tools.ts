@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { ReminderPayload, TaskPayload } from '../../types'
-import { defineTool, type ToolDef } from './registry'
+import { defineTool, type SchedulerLike, type ToolDef } from './registry'
 
 const CRON_RE = /^[\d*/,-]+ [\d*/,-]+ [\d*/,-]+ [\d*/,-]+ [\d*/,-]+$/
 
@@ -8,6 +8,9 @@ const HOURLY_AT_MOST = /^\d{1,2} /
 export const MAX_SCHEDULED_TASKS = 20
 
 const NO_SCHEDULER = 'error: nothing can be scheduled from here'
+
+const userSchedules = async (agent: SchedulerLike) =>
+  (await agent.listSchedules()).filter((s) => s.callback === 'fireReminder' || s.callback === 'runTask')
 
 const WHEN = z
   .string()
@@ -67,7 +70,7 @@ export const scheduleTools: ToolDef[] = [
       if (!ctx.agent) {
         return NO_SCHEDULER
       }
-      const schedules = await ctx.agent.listSchedules()
+      const schedules = await userSchedules(ctx.agent)
       if (schedules.length === 0) {
         return '(nothing scheduled)'
       }
@@ -88,7 +91,9 @@ export const scheduleTools: ToolDef[] = [
       if (!ctx.agent) {
         return NO_SCHEDULER
       }
-      return (await ctx.agent.cancelSchedule(id)) ? `cancelled ${id}` : `not found: ${id}`
+      const own = (await userSchedules(ctx.agent)).some((s) => s.id === id)
+      const cancelled = own && (await ctx.agent.cancelSchedule(id))
+      return cancelled ? `cancelled ${id}` : `not found: ${id}`
     },
   }),
 ]
