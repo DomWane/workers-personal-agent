@@ -14,13 +14,16 @@
     "bindings": [
       { "name": "PERSONAL_AGENT", "class_name": "PersonalAgent" },
       { "name": "RESEARCH_SCOUT", "class_name": "ResearchScout" },
-      { "name": "MAINTENANCE", "class_name": "MaintenanceAgent" }
+      { "name": "MAINTENANCE", "class_name": "MaintenanceAgent" },
+      { "name": "MCP_REGISTRY", "class_name": "McpRegistry" },
+      { "name": "MCP_CLIENT", "class_name": "McpClient" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["PersonalAgent"] },
     { "tag": "v2", "new_sqlite_classes": ["ResearchScout"] },
-    { "tag": "v3", "new_sqlite_classes": ["MaintenanceAgent"] }
+    { "tag": "v3", "new_sqlite_classes": ["MaintenanceAgent"] },
+    { "tag": "v4", "new_sqlite_classes": ["McpRegistry", "McpClient"] }
   ],
   // `run_worker_first` is the guard against the asset server swallowing routes: without it a
   // static 404/SPA page answers them and the Worker never sees the request. It has bitten twice,

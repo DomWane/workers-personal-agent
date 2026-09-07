@@ -16,6 +16,7 @@ Long-term memory is markdown in an R2 bucket; semantic recall is an embedding in
   │                                                                          │
   │     PersonalAgent   one per thread   ──►  archive                        │
   │         ├── RPC, free ───────────────►  index  ──►  embeddings           │
+  │         ├── RPC, free ───────────────►  MCP: registry, one DO a server   │
   │         └── fans out ──────►  ResearchScout  one per angle  ──►  archive │
   │                                                                          │
   │     reflection   woken nightly, never inside a turn                      │
@@ -145,8 +146,7 @@ notice.
 | `search()` brute-force cosine | 30 s CPU, 1024 dims/vector | far further out than the 1 to 5k vectors this row used to claim | recall throws or truncates |
 | Reindex CPU per slice | same 30 s | not the binding constraint; embeddings are | nothing |
 | Scheduled tasks | `MAX_SCHEDULED_TASKS = 20`, and a recurring task hourly at most | a model that reads a page telling it to poll every minute | `set_scheduled_task` answers with an error naming the limit; reminders are exempt, they send one message |
-| `listSkills` | `MAX_SKILLS = 30` | 31 skills | loud since 2026-08-06: `stage: 'skills-truncated'` |
-| `read_page` fallback | Firecrawl when Browser Rendering refuses | every blocked page | loud: `at: 'read_page'`, `via`, `fellBack`, `why` |
+| `listSkills` | `MAX_SKILLS = 30` | 31 skills | loud since 2026-08-06: `stage: 'skills-truncated'` || `read_page` fallback | Firecrawl when Browser Rendering refuses | every blocked page | loud: `at: 'read_page'`, `via`, `fellBack`, `why` |
 | `search_memory` keyword hits | `MAX_MEMORY_RESULTS = 3` + `MAX_SESSION_RESULTS = 2` | always | **silent** truncation of the tail |
 | Semantic hits | 5 | always | **silent** |
 | Memory/session body in a prompt | `MAX_CONTENT_CHARS = 4000` | long notes | **silent** truncation |
@@ -228,6 +228,7 @@ a description of the code; it is what the code cannot tell you.
 | [history-and-archive.md](docs/decisions/history-and-archive.md) | Compaction on the model's context window, the archive that survives it, and what the nightly reflection is allowed to see. |
 | [memory-and-the-gate.md](docs/decisions/memory-and-the-gate.md) | Provenance on every write, the gate on the two that destroy something, and the ratings nothing reads yet. |
 | [tool-boundary.md](docs/decisions/tool-boundary.md) | One zod schema per tool: shown to the model and used to parse its reply, so the two cannot drift. |
+| [mcp.md](docs/decisions/mcp.md) | One Durable Object per MCP server, a registry that holds the catalog so a turn wakes nothing, and why that traffic is bounded rather than counted. |
 | [research.md](docs/decisions/research.md) | Waves of scout Durable Objects, the four caps on a run, and what the first production runs measured. |
 | [providers-and-models.md](docs/decisions/providers-and-models.md) | Why `/api/models` is proxied, and the one Cloudflare token that covers everything. |
 | [linting-and-formatting.md](docs/decisions/linting-and-formatting.md) | Which oxlint rules are on, which were counted and refused, and why TypeScript 7 is blocked. |
@@ -242,7 +243,10 @@ it destroys.
 `SubrequestBudget` ([src/agent/subrequest-budget.ts](src/agent/subrequest-budget.ts)) wraps
 `fetch` and counts. Every connector takes an optional trailing
 `doFetch: typeof globalThis.fetch`; a new connector that calls `globalThis.fetch` directly is
-invisible to the budget and will silently reintroduce the failure mode below.
+invisible to the budget and will silently reintroduce the failure mode below. The one exception is
+an `McpClient`: the SDK transport does its own fetch, and a fetch handed to it does not survive
+a restore from storage, so that traffic is bounded instead of counted, by one connection per
+Durable Object ([docs/decisions/mcp.md](docs/decisions/mcp.md)).
 
 **Maintenance never runs inside a turn.** Index reconciliation and `MEMORY.md` rebuilds belong in
 alarms, which are separate invocations with their own budget. A turn may notice that maintenance

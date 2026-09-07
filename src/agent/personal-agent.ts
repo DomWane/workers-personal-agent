@@ -1,4 +1,4 @@
-import { Agent, callable } from 'agents'
+import { Agent, callable, getAgentByName } from 'agents'
 import type OpenAI from 'openai'
 import { createLlmClient } from '../connectors/llm.connector'
 import { llmConfig } from './llm-config'
@@ -16,6 +16,9 @@ import {
 } from './archive'
 import { historyForTurn, isContextOverflow, pairedOnly, spoken } from './context-window'
 import * as compaction from './history-compaction'
+import { mcpRegistry } from './mcp-registry'
+import type { McpClientRpc } from './mcp-client'
+import { buildMcpTools } from './mcp-tools'
 import { verdictFor, type CitationVerdict } from './provenance'
 import { buildSystemPrompt } from './system-prompt'
 import { contentEnabled, createLog, errorFields, ORPHAN_LOG, type LogSource, type TurnLog } from './log'
@@ -24,7 +27,7 @@ import { cachedSubrequestLimit } from './workers-plan'
 import * as research from './research-commands'
 import { runToolLoop, turnToolTraffic, type StopReason } from './tool-loop'
 import { buildTools } from './tools'
-import type { ToolContext } from './tools/registry'
+import type { ToolContext, ToolDef } from './tools/registry'
 import type {
   AgentState,
   ChatMessage,
@@ -44,6 +47,7 @@ interface TurnOutcome {
   toolsUsed: string[]
   elapsedMs: number
   tokensSpent: number
+  mcpTools: number
 }
 
 function turnFields(o: TurnOutcome) {
@@ -54,6 +58,7 @@ function turnFields(o: TurnOutcome) {
     toolsUsed: o.toolsUsed,
     elapsedMs: o.elapsedMs,
     tokensSpent: o.tokensSpent,
+    mcpTools: o.mcpTools,
   }
 }
 
@@ -255,6 +260,26 @@ export class PersonalAgent extends Agent<Env, AgentState> {
     return this.env.MAINTENANCE.get(this.env.MAINTENANCE.idFromName(INDEX_INSTANCE))
   }
 
+  private async turnTools(log: TurnLog): Promise<{ tools: ToolDef[]; mcpTools: number }> {
+    const native = buildTools()
+    try {
+      const catalog = await mcpRegistry(this.env).listTools()
+      const mcp = buildMcpTools(
+        catalog,
+        async (serverId, name, args) => {
+          const client = (await getAgentByName(this.env.MCP_CLIENT, serverId)) as unknown as McpClientRpc
+          return client.callTool(name, args)
+        },
+        native.map((t) => t.name),
+        log,
+      )
+      return { tools: [...native, ...mcp], mcpTools: mcp.length }
+    } catch (err) {
+      log.error({ at: 'mcp', stage: 'catalog-failed', error: errorFields(err) })
+      return { tools: native, mcpTools: 0 }
+    }
+  }
+
   toolContext(budget?: SubrequestBudget, log?: TurnLog, turn?: HistoryMessage): ToolContext {
     const thisThread = threadOf(this.name) ?? this.name
     return {
@@ -341,6 +366,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
 
     const startedAt = Date.now()
     const client = this.llm(budget)
+    const { tools, mcpTools } = await this.turnTools(log)
     const {
       text: reply,
       toolsUsed,
@@ -358,7 +384,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
         this.state.historySummary,
       ),
       history: outgoing,
-      tools: buildTools(),
+      tools,
       ctx: this.toolContext(budget, log, opts.userMessageId ? persistedUser : ownTurn),
       subrequests: budget,
       log,
@@ -386,7 +412,15 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       ...(toolsUsed.includes('update_agent_notes') ? { agentNotes: undefined } : {}),
     })
     await compaction.maybeCompactHistory(this, log)
-    return { reply, stopReason, roundsUsed, toolsUsed, tokensSpent, elapsedMs: Date.now() - startedAt }
+    return {
+      reply,
+      stopReason,
+      roundsUsed,
+      toolsUsed,
+      tokensSpent,
+      elapsedMs: Date.now() - startedAt,
+      mcpTools,
+    }
   }
 
   @callable()
@@ -452,16 +486,18 @@ export class PersonalAgent extends Agent<Env, AgentState> {
     const log = this.newLog('schedule')
     try {
       const client = this.llm(budget)
-      const { text } = await runToolLoop({
+      const { tools, mcpTools } = await this.turnTools(log)
+      const { text, stopReason, roundsUsed, toolsUsed } = await runToolLoop({
         log,
         client,
         model: this.model,
         systemPrompt: buildSystemPrompt(this.state.userProfile ?? '', this.state.agentNotes ?? ''),
         history: [{ role: 'user', content: payload.prompt }],
-        tools: buildTools(),
+        tools,
         ctx: this.toolContext(budget, log),
         subrequests: budget,
       })
+      log.event({ at: 'task', outcome: 'ok', stopReason, roundsUsed, toolsUsed, mcpTools, subrequests: budget.spent })
       await this.emit(text)
     } catch (err) {
       log.error({

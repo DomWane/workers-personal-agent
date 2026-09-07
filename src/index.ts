@@ -1,6 +1,8 @@
 import { getAgentByName, routeAgentRequest } from 'agents'
 import { threadId, webAgentName, WEB_IDENTITY } from './agent/agent-name'
 import { INDEX_INSTANCE, REFLECTION_INSTANCE } from './agent/maintenance-agent'
+import { mcpRegistry, type McpResult } from './agent/mcp-registry'
+import type { McpClientRpc } from './agent/mcp-client'
 import { createMemoryStore } from './agent/memory/vault-store'
 import { llmConfig } from './agent/llm-config'
 import { readModels } from './agent/model-catalogue'
@@ -9,6 +11,8 @@ import type { AgentState, Env, ModelRow } from './types'
 export { PersonalAgent } from './agent/personal-agent'
 export { MaintenanceAgent } from './agent/maintenance-agent'
 export { ResearchScout } from './agent/research-scout'
+export { McpRegistry } from './agent/mcp-registry'
+export { McpClient } from './agent/mcp-client'
 
 function accessRefusal(request: Request, env: Env): Response | undefined {
   if (env.ENVIRONMENT === 'localhost') {
@@ -93,6 +97,10 @@ export default {
       return Response.json(threads.sort((a, b) => b.at - a.at))
     }
 
+    if (url.pathname.startsWith('/api/mcp/')) {
+      return handleMcpApi(request, url, env)
+    }
+
     if (url.pathname.startsWith('/agents/')) {
       return handleAgentRequest(request, url, env)
     }
@@ -146,6 +154,10 @@ async function handleModelList(env: Env): Promise<Response> {
 
 async function handleAgentRequest(request: Request, url: URL, env: Env): Promise<Response> {
   const [, , className, name, ...rest] = url.pathname.split('/')
+  if (className === 'mcp-client' && MCP_SERVER_ID.test(name)) {
+    const res = await routeAgentRequest(request, env)
+    return res ?? new Response('not found', { status: 404 })
+  }
   if (className !== 'personal-agent') {
     return new Response('not found', { status: 404 })
   }
@@ -155,4 +167,56 @@ async function handleAgentRequest(request: Request, url: URL, env: Env): Promise
 
   const res = await routeAgentRequest(new Request(rewritten, request), env)
   return res ?? new Response('not found', { status: 404 })
+}
+
+const MCP_SERVERS_PATH = '/api/mcp/servers'
+const MCP_SERVER_ID = /^[a-z][a-z0-9_-]{0,63}$/
+
+function mcpReply<T extends object>(result: McpResult<T>, status = 200): Response {
+  return result.ok ? Response.json(result, { status }) : Response.json({ error: result.error }, { status: 400 })
+}
+
+async function mcpClient(env: Env, id: string): Promise<McpClientRpc> {
+  return (await getAgentByName(env.MCP_CLIENT, id)) as unknown as McpClientRpc
+}
+
+async function handleMcpApi(request: Request, url: URL, env: Env): Promise<Response> {
+  const registry = mcpRegistry(env)
+  const callbackHost = `${url.protocol}//${url.host}`
+  const rest = url.pathname.startsWith(`${MCP_SERVERS_PATH}/`) ? url.pathname.slice(MCP_SERVERS_PATH.length + 1) : ''
+  const [id, action] = rest.split('/').map(decodeURIComponent)
+  const validId = MCP_SERVER_ID.test(id)
+  try {
+    if (request.method === 'GET' && url.pathname === MCP_SERVERS_PATH) {
+      return Response.json({ servers: await registry.listServers() })
+    }
+    if (request.method === 'POST' && url.pathname === MCP_SERVERS_PATH) {
+      const body = (await request.json()) as { name?: unknown; url?: unknown; bearer?: unknown }
+      const name = typeof body.name === 'string' ? body.name.trim() : ''
+      const serverUrl = typeof body.url === 'string' ? body.url.trim() : ''
+      const bearer = typeof body.bearer === 'string' ? body.bearer : undefined
+      if (!name || !serverUrl) {
+        return Response.json({ error: 'name and url are required' }, { status: 400 })
+      }
+      const added = await registry.addServer(name, serverUrl)
+      if (!added.ok) {
+        return mcpReply(added)
+      }
+      const server = await mcpClient(env, added.id)
+      return mcpReply(await server.configure({ id: added.id, name, url: serverUrl, bearer, callbackHost }), 201)
+    }
+    if (request.method === 'POST' && validId && action === 'connect') {
+      return mcpReply(await (await mcpClient(env, id)).connectServer())
+    }
+    if (request.method === 'DELETE' && validId && !action) {
+      const dropped = await (await mcpClient(env, id)).remove()
+      if (dropped.ok) {
+        await registry.removeServer(id)
+      }
+      return mcpReply(dropped)
+    }
+  } catch (err) {
+    return Response.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
+  }
+  return Response.json({ error: 'not found' }, { status: 404 })
 }

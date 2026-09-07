@@ -533,6 +533,51 @@ produced:
 and it had — but the way to know that is `wrangler r2 object get .../agent/memory/archive/<slug>.md`,
 not the sentence in the log.
 
+### 8b. An MCP server the chat can call — settings, then a tool round
+
+The seams no suite reaches: the settings dialog is a browser surface, and the OAuth dance ends in a
+popup the tests will not run. `wrangler dev --local` runs on `ENVIRONMENT=localhost`, so the
+refusal gate is off and the MCP server can be **any** reachable streamable-HTTP endpoint — start
+with the framework's own example on another port rather than a production server you do not want a
+dev Worker poking. The walkthrough is the same for a real server; only the auth differs.
+
+```bash
+# 1 — a local MCP server. The cloudflare/agents examples ship a streamable-HTTP one:
+#    examples/mcp (stateful server). `npx wrangler dev --local` it on its own port and note its
+#    /mcp URL (e.g. http://127.0.0.1:8788/mcp).
+# 2 — the agent Worker (real provider optional; the stub's STUB_TOOLS=1 does not know MCP tools,
+#    so a real LLM_MODEL is what can actually choose an MCP tool in a turn).
+pnpm build:web
+npx wrangler dev --local
+```
+
+Walked with a bearer-token example server on 2026-09-07:
+
+- open **Settings** (the gear in the header), **Add server**: a name, the `/mcp` URL, and — for a
+  server that wants one — the bearer token. The row appears, flips through *Connecting* and settles
+  on **Ready**; a key-authenticated server never opens a popup
+- leave the dialog and send a message that asks for the server's tool (the example's `echo`):
+  the model answers using it, and under the answer the thread shows the tool used
+- the server's own Durable Object is the one that talked to it, so the *chat* turn's `subrequests` count does not
+  climb with MCP calls; the log's `mcpTools` field is the number of server tools the turn held
+- remove the server in Settings: the row disappears, and the very next message no longer offers
+  the tools (the catalog is fetched per turn, so there is no stale cache to wait out)
+
+**The failure half:** with the server stopped, add it again. The row settles on **Failed** — that is
+the loud part — and a chat message still works; the failed server's tools are simply absent from
+the turn. A *ready* server that dies between catalog and call returns an `error:` tool result the
+model sees, not a thrown turn.
+
+**OAuth servers** (GitHub, Notion-class) cannot be finished by a test, and they are the reason the
+dialog exists. Add the server and a popup opens with the provider's sign-in; complete it, the popup
+closes itself, and the row polls to **Ready** — which is what the *Sign in* button on a waiting row
+is for if the popup was dismissed first. The callback path is `/agents/mcp-client/<server id>/callback`;
+in production it sits behind Cloudflare Access, which is fine because the redirect rides the
+user's own browser session — an expired Access session just means an Access login inside the
+popup, eating into the OAuth code's short lifetime. Walk that against a real server when one is
+actually connected; the local example server's `mcp-worker-authenticated` variant covers the flow
+without one.
+
 ## Cleaning up
 
 The seeded threads are real Durable Objects and stay in `agent/threads.json` until deleted. Delete
