@@ -30,6 +30,8 @@ platform limit it runs into is measured and written down.
   reconciliation, all Durable Object alarms, none inside a chat turn.
 - **Several conversations**, listed in a sidebar and registered in the vault, so a cleared browser
   cannot strand a thread.
+- **MCP servers** added in a settings dialog, with OAuth or a bearer token. Their tools are in every
+  chat from the next message on.
 - **Guards at the boundaries.** Every outbound call goes through a subrequest counter with a
   reserve, and each tool's zod schema is both the JSON Schema the model sees and the parser its
   reply goes through.
@@ -62,9 +64,8 @@ Worker refuses to open your vault to whoever finds the URL. What was measured ab
 WebSockets, and how to run it open on purpose, is in
 [ARCHITECTURE.md](ARCHITECTURE.md#deploying-this).
 
-The committed config runs on Workers AI (`@cf/zai-org/glm-4.7-flash`, 131k context), so nothing
-else is needed. Web search runs keyless on Tavily and Firecrawl. Any OpenAI-compatible endpoint is
-one var and one secret away, see Configuration below.
+The committed config runs on Workers AI and searches keyless, so nothing else is needed. Another
+provider is one var and one secret, see Configuration.
 
 ## 💬 Try it
 
@@ -77,6 +78,8 @@ one var and one secret away, see Configuration below.
   Drop, then a status card that updates as the scouts work.
 - **"What did that article say about pricing?"** — `search_tool_results` over the pages this thread
   already fetched, no network request.
+- **Open Settings, add `https://mcp.cloudflare.com/mcp` and sign in, then ask about your Workers** —
+  the server's tools are called as `cloudflare_<tool>` in the next turn.
 
 ## 🧭 How it works
 
@@ -85,6 +88,9 @@ flowchart LR
     B[Browser<br/>Vue client] <-->|WebSocket, broadcast state| T[Thread<br/>Durable Object]
     T -->|OpenAI-compatible API| M[Model<br/>Workers AI or any endpoint]
     T -->|RPC| I[Index instance<br/>embeddings in DO SQLite]
+    T -->|RPC, catalog| G[MCP registry]
+    T -->|RPC, tool call| K[MCP client DO<br/>one per server] -->|MCP over HTTP| X((MCP server))
+    K -->|state, tools| G
     T <-->|markdown| V[(R2 vault<br/>memories, profile, skills)]
     T -->|research wave| S1[Scout DO]
     T -->|research wave| S2[Scout DO]
@@ -93,12 +99,10 @@ flowchart LR
     R -->|reads archive| T
 ```
 
-One Durable Object per thread runs the tool loop. Memory lives in R2 as markdown; the embedding
-index lives in one maintenance instance that every thread queries by RPC, so it is built once and
-the query costs no external subrequest. Research scouts are child Durable Objects with budgets of
-their own. The full picture, with every limit and how it was measured, is
-[ARCHITECTURE.md](ARCHITECTURE.md); the rejected alternative behind each subsystem is in
-[docs/decisions/](docs/decisions/).
+One Durable Object per thread runs the tool loop. The index instance, the scouts and the MCP clients
+each spend a budget of their own, and a thread reaches them by RPC, which costs no external
+subrequest. The full picture is [ARCHITECTURE.md](ARCHITECTURE.md); the rejected alternative behind
+each subsystem is in [docs/decisions/](docs/decisions/).
 
 ## ⚙️ Configuration
 
@@ -192,6 +196,7 @@ src/
     research-*.ts          proposal, wave of scouts, rounds, report
     history-compaction.ts  compaction, with context-window.ts for the arithmetic
     maintenance-agent.ts   the embedding index and the nightly reflection
+    mcp-client.ts          MCP servers, with mcp-registry.ts for their tool catalog
     memory/                R2 vault, markdown format, embedding index
     tools/                 one file per tool family, zod schemas
   connectors/              LLM, Tavily, Firecrawl, Browser Rendering, R2
@@ -204,7 +209,7 @@ docs/                      decisions, measurements, the manual walkthrough
 
 - **[Choosing a retriever by measuring it](docs/retrieval-eval.md):** 673 real exchanges, graded
   relevance, pooled judgments. Dense retrieval (`bge-m3`) beats BM25 by **+0.200 nDCG@10
-  [0.070, 0.326]**. Hybrid fusion and a cross-encoder reranker were both tested and rejected.
+  [0.070, 0.326]**.
 - **[Does ThinkingCap's token saving hold in Czech, over real work?](docs/thinkingcap-replication.md):**
   an independent replication off the benchmark the claim was made on. The saving holds at
   **50.8% [43.2%, 57.7%]**; the capability half is underpowered, and the write-up says so.
