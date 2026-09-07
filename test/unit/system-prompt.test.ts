@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSystemPrompt } from '../../src/agent/system-prompt'
+import { buildSystemPrompt, renderSkillIndex } from '../../src/agent/system-prompt'
 
 /**
  * The one place the assembled prompt is pinned verbatim. Everything else that touches it asserts a
@@ -19,8 +19,13 @@ function assembly(prompt: string): string {
 }
 
 describe('buildSystemPrompt', () => {
-  it('assembles profile, notes and summary in one pinned shape', () => {
-    const prompt = buildSystemPrompt('Lives in Prague.', 'Prefers short replies.', 'Earlier: we sized the vault.')
+  it('assembles profile, notes, skills and summary in one pinned shape', () => {
+    const prompt = buildSystemPrompt(
+      'Lives in Prague.',
+      'Prefers short replies.',
+      '- daily-digest — AI news each morning',
+      'Earlier: we sized the vault.',
+    )
 
     expect(prompt.startsWith(PERSONA_HEAD)).toBe(true)
     expect(assembly(prompt))
@@ -34,6 +39,11 @@ Your own working notes (operational facts you've learned — keep current with u
 Prefers short replies.
 </agent_notes>
 
+Your saved skills (slug — what it handles; read_skill the slug for the procedure):
+<skills>
+- daily-digest — AI news each morning
+</skills>
+
 Earlier parts of this conversation were compacted; this summary is what the dropped turns said:
 <earlier_conversation_summary>
 Earlier: we sized the vault.
@@ -45,11 +55,21 @@ Earlier: we sized the vault.
     const prompt = buildSystemPrompt('', '')
     expect(assembly(prompt)).toContain('<user_profile>\n(nothing learned yet)\n</user_profile>')
     expect(assembly(prompt)).toContain('<agent_notes>\n(nothing learned yet)\n</agent_notes>')
+    expect(assembly(prompt)).toContain('<skills>\n(none saved yet)\n</skills>')
+  })
+
+  it('renders the skill index as one slug and description line per skill', () => {
+    const meta = { name: 'x', useCount: 0, pinned: false }
+    const index = renderSkillIndex([
+      { ...meta, slug: 'a', description: 'first' },
+      { ...meta, slug: 'b', description: 'second' },
+    ])
+    expect(index).toBe('- a — first\n- b — second')
   })
 
   it('leaves the summary block out entirely when there is nothing compacted', () => {
     // Present-but-empty would tell the model turns were dropped when none were.
-    expect(buildSystemPrompt('x', 'y', '   ')).not.toContain('earlier_conversation_summary')
+    expect(buildSystemPrompt('x', 'y', '', '   ')).not.toContain('earlier_conversation_summary')
     expect(buildSystemPrompt('x', 'y')).not.toContain('earlier_conversation_summary')
   })
 })

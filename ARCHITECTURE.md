@@ -228,6 +228,7 @@ a description of the code; it is what the code cannot tell you.
 | [history-and-archive.md](docs/decisions/history-and-archive.md) | Compaction on the model's context window, the archive that survives it, and what the nightly reflection is allowed to see. |
 | [memory-and-the-gate.md](docs/decisions/memory-and-the-gate.md) | Provenance on every write, the gate on the two that destroy something, and the ratings nothing reads yet. |
 | [tool-boundary.md](docs/decisions/tool-boundary.md) | One zod schema per tool: shown to the model and used to parse its reply, so the two cannot drift. |
+| [skills.md](docs/decisions/skills.md) | The skill index in every system prompt, bodies behind `read_skill`, and use as the only thing that keeps one alive. |
 | [mcp.md](docs/decisions/mcp.md) | One Durable Object per MCP server, a registry that holds the catalog so a turn wakes nothing, and why that traffic is bounded rather than counted. |
 | [research.md](docs/decisions/research.md) | Waves of scout Durable Objects, the four caps on a run, and what the first production runs measured. |
 | [providers-and-models.md](docs/decisions/providers-and-models.md) | Why `/api/models` is proxied, and the one Cloudflare token that covers everything. |

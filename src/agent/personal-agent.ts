@@ -20,7 +20,7 @@ import { mcpRegistry } from './mcp-registry'
 import type { McpClientRpc } from './mcp-client'
 import { buildMcpTools } from './mcp-tools'
 import { verdictFor, type CitationVerdict } from './provenance'
-import { buildSystemPrompt } from './system-prompt'
+import { buildSystemPrompt, renderSkillIndex } from './system-prompt'
 import { contentEnabled, createLog, errorFields, ORPHAN_LOG, type LogSource, type TurnLog } from './log'
 import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from './subrequest-budget'
 import { cachedSubrequestLimit } from './workers-plan'
@@ -256,6 +256,15 @@ export class PersonalAgent extends Agent<Env, AgentState> {
     }
   }
 
+  private async loadSkillIndex(log: TurnLog): Promise<string> {
+    try {
+      return renderSkillIndex(await createMemoryStore(this.env).listSkills())
+    } catch (err) {
+      log.error({ at: 'skill-index-load', degraded: true, error: errorFields(err) })
+      return ''
+    }
+  }
+
   maintenance() {
     return this.env.MAINTENANCE.get(this.env.MAINTENANCE.idFromName(INDEX_INSTANCE))
   }
@@ -381,6 +390,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       systemPrompt: buildSystemPrompt(
         await this.loadUserProfile(log),
         await this.loadAgentNotes(log),
+        await this.loadSkillIndex(log),
         this.state.historySummary,
       ),
       history: outgoing,
@@ -491,7 +501,11 @@ export class PersonalAgent extends Agent<Env, AgentState> {
         log,
         client,
         model: this.model,
-        systemPrompt: buildSystemPrompt(this.state.userProfile ?? '', this.state.agentNotes ?? ''),
+        systemPrompt: buildSystemPrompt(
+          await this.loadUserProfile(log),
+          await this.loadAgentNotes(log),
+          await this.loadSkillIndex(log),
+        ),
         history: [{ role: 'user', content: payload.prompt }],
         tools,
         ctx: this.toolContext(budget, log),

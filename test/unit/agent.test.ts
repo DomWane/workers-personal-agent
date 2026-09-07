@@ -122,6 +122,19 @@ describe('core memory injection', () => {
     expect(system.content).toContain('- vault repo is owner/vault')
   })
 
+  it('injects the skill index into the system prompt, so the model needs no list_skills call', async () => {
+    await mockCoreMemory(null)
+    await mockSkillHit('daily-digest')
+    let sent: Record<string, unknown> | undefined
+    mockCompletion('hi', (b) => {
+      sent = b
+    })
+    await devChat('hello')
+    const system = (sent!.messages as { role: string; content: string }[])[0]
+    expect(system.content).toContain('<skills>\n- daily-digest — d\n</skills>')
+    expect(system.content).not.toContain('Do the digest.')
+  })
+
   it('does not refetch the profile mid-session (frozen snapshot)', async () => {
     await mockCoreMemory('- Sam likes tea')
     mockCompletion('first')
@@ -257,6 +270,25 @@ describe('core memory invalidation after a write', () => {
     const system = (sent!.messages as { content: string }[])[0].content
     expect(system).toContain('- Works at ACME')
     expect(system).not.toContain('OLDCORP')
+  })
+
+  it('shows a skill saved in one turn in the prompt of the next, read from the vault', async () => {
+    await mockCoreMemory(null)
+    mockToolCallCompletion(
+      'save_skill',
+      JSON.stringify({ name: 'Weekly review', description: 'Sunday wrap-up', content: '## Procedure\nReview.' }),
+    )
+    mockCompletion('saved')
+    const { thread } = await devChat('save this as a skill')
+
+    let sent: Record<string, unknown> | undefined
+    mockCompletion('ok', (b) => {
+      sent = b
+    })
+    await devChat('and now?', thread)
+
+    const system = (sent!.messages as { content: string }[])[0].content
+    expect(system).toContain('<skills>\n- weekly-review — Sunday wrap-up\n</skills>')
   })
 })
 
