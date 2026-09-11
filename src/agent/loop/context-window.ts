@@ -1,5 +1,5 @@
-import type { TurnLog } from '../log'
-import type { HistoryMessage, ToolCall } from '../../types'
+import type { TurnLog } from '@/agent/log'
+import type { HistoryMessage, ToolCall } from '@/types'
 
 const COMPACT_AT_FRACTION = 0.8
 const COMPACT_KEEP_FRACTION = 0.25

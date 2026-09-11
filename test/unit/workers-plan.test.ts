@@ -1,8 +1,8 @@
 import { env, fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { FREE_PLAN_SUBREQUESTS, PAID_PLAN_SUBREQUESTS } from '../../src/agent/subrequest-budget'
-import { cachedSubrequestLimit, fetchSubrequestLimit } from '../../src/agent/workers-plan'
-import type { Env } from '../../src/types'
+import { FREE_PLAN_SUBREQUESTS, PAID_PLAN_SUBREQUESTS } from '@/agent/subrequest-budget'
+import { cachedSubrequestLimit, fetchSubrequestLimit } from '@/agent/workers-plan'
+import type { Env } from '@/types'
 
 beforeAll(() => {
   fetchMock.activate()

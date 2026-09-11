@@ -1,4 +1,4 @@
-import { appendArchive, type CompactionRecord } from '../archive'
+import { appendArchive, type CompactionRecord } from '@/agent/archive'
 import {
   compactAt,
   compactKeep,
@@ -7,13 +7,13 @@ import {
   historyTokens,
   planCompaction,
   spoken,
-} from './context-window'
-import { errorFields, type TurnLog } from '../log'
-import { contextWindowOf } from '../model-catalogue'
-import type { PersonalAgent } from '../personal-agent'
-import { retryOnce } from '../retry'
-import { summarizeHead } from '../sessions'
-import type { SubrequestBudget } from '../subrequest-budget'
+} from '@/agent/loop/context-window'
+import { errorFields, type TurnLog } from '@/agent/log'
+import { contextWindowOf } from '@/agent/model-catalogue'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import { retryOnce } from '@/agent/retry'
+import { summarizeHead } from '@/agent/sessions'
+import type { SubrequestBudget } from '@/agent/subrequest-budget'
 
 function promptSize(agent: PersonalAgent): number {
   return agent.state.promptTokens ?? historyTokens(agent.state.messages, agent.state.historySummary)

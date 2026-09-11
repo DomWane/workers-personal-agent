@@ -1,10 +1,10 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { PersonalAgent } from '../../src/agent/personal-agent'
-import { appendArchive, readArchive, type CompactionRecord } from '../../src/agent/archive'
-import { sqlTag } from '../../src/agent/archive'
-import type { AgentState, Env, HistoryMessage } from '../../src/types'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import { appendArchive, readArchive, type CompactionRecord } from '@/agent/archive'
+import { sqlTag } from '@/agent/archive'
+import type { AgentState, Env, HistoryMessage } from '@/types'
 import { readVault } from '../helpers/vault'
 
 beforeAll(() => {

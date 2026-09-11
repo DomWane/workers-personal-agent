@@ -1,8 +1,8 @@
 import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import worker, { McpClient } from '../../src/index'
-import type { Env } from '../../src/types'
-import type { McpServerView } from '../../src/types'
+import worker, { McpClient } from '@/index'
+import type { Env } from '@/types'
+import type { McpServerView } from '@/types'
 import { CONNECT_GETS, CONNECT_POSTS, mockMcpServer } from '../helpers/mcp-server'
 
 beforeAll(() => {

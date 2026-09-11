@@ -1,7 +1,12 @@
-import { errorFields, type TurnLog } from '../log'
-import { createMemoryStore } from '../memory/vault-store'
-import type { PersonalAgent } from '../personal-agent'
-import { concatFindings, formatResearchOffer, formatResearchProposal, ungroundedCitations } from './round'
+import { errorFields, type TurnLog } from '@/agent/log'
+import { createMemoryStore } from '@/agent/memory/vault-store'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import {
+  concatFindings,
+  formatResearchOffer,
+  formatResearchProposal,
+  ungroundedCitations,
+} from '@/agent/research/round'
 import {
   planResearch,
   runResearchRound as runRound,
@@ -9,7 +14,7 @@ import {
   writeResearchReport,
   type PlanRevision,
   type ScoutOutcome,
-} from './runner'
+} from '@/agent/research/runner'
 import {
   applyRound,
   applyWave,
@@ -26,10 +31,10 @@ import {
   startResearch as runFromProposal,
   RESEARCH_PRESETS,
   RESEARCH_SCOUT_BUDGET,
-} from './state'
-import { retryOnce } from '../retry'
-import type { SubrequestBudget } from '../subrequest-budget'
-import type { ResearchPreset, ResearchState, ScoutCounts, StopCause } from '../../types'
+} from '@/agent/research/state'
+import { retryOnce } from '@/agent/retry'
+import type { SubrequestBudget } from '@/agent/subrequest-budget'
+import type { ResearchPreset, ResearchState, ScoutCounts, StopCause } from '@/types'
 
 export async function proposeResearch(agent: PersonalAgent, topic: string): Promise<void> {
   const clean = topic.trim()

@@ -1,14 +1,14 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { VaultStore } from '../../src/agent/memory/vault-store'
+import { VaultStore } from '@/agent/memory/vault-store'
 import { seedVault, skillFile } from '../helpers/vault'
-import { EmbeddingIndex } from '../../src/agent/memory/embedding-index'
-import { sqlTag } from '../../src/agent/archive'
-import type { MaintenanceAgent } from '../../src/agent/maintenance-agent'
-import { PersonalAgent as PersonalAgentClass, type PersonalAgent } from '../../src/agent/personal-agent'
-import { WEB_IDENTITY, webAgentName } from '../../src/agent/agent-name'
-import type { Env } from '../../src/types'
+import { EmbeddingIndex } from '@/agent/memory/embedding-index'
+import { sqlTag } from '@/agent/archive'
+import type { MaintenanceAgent } from '@/agent/maintenance-agent'
+import { PersonalAgent as PersonalAgentClass, type PersonalAgent } from '@/agent/personal-agent'
+import { WEB_IDENTITY, webAgentName } from '@/agent/agent-name'
+import type { Env } from '@/types'
 
 const testEnv = env as Env
 

@@ -1,8 +1,8 @@
 import { fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { summarizeHead } from '../../src/agent/sessions'
-import { createLlmClient } from '../../src/connectors/llm.connector'
-import type { HistoryMessage } from '../../src/types'
+import { summarizeHead } from '@/agent/sessions'
+import { createLlmClient } from '@/connectors/llm.connector'
+import type { HistoryMessage } from '@/types'
 
 beforeAll(() => {
   fetchMock.activate()

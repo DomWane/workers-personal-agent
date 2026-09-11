@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { contentEnabled, createLog, errorFields, LOG_SCHEMA_VERSION, ORPHAN_LOG } from '../../src/agent/log'
+import { contentEnabled, createLog, errorFields, LOG_SCHEMA_VERSION, ORPHAN_LOG } from '@/agent/log'
 
 function capture(run: () => void): Record<string, unknown>[] {
   const lines: string[] = []

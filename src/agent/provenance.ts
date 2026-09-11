@@ -1,4 +1,4 @@
-import type { HistoryMessage } from '../types'
+import type { HistoryMessage } from '@/types'
 
 export type CitationVerdict = { ok: true; message: HistoryMessage } | { ok: false; why: Refusal }
 

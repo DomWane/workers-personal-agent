@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { createMemoryStore } from '../memory/vault-store'
-import { defineTool, type ToolDef } from './registry'
+import { createMemoryStore } from '@/agent/memory/vault-store'
+import { defineTool, type ToolDef } from '@/agent/tools/registry'
 
 export const agentNotesTools: ToolDef[] = [
   defineTool({

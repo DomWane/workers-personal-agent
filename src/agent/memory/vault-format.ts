@@ -1,4 +1,4 @@
-import type { MemoryEntry, SkillMeta } from './memory-store'
+import type { MemoryEntry, SkillMeta } from '@/agent/memory/memory-store'
 
 export const MAX_CONTENT_CHARS = 4000
 

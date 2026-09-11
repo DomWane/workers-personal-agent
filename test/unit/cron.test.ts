@@ -1,7 +1,7 @@
 import { env, fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { runNightly } from '../../src/index'
-import type { Env } from '../../src/types'
+import { runNightly } from '@/index'
+import type { Env } from '@/types'
 
 const testEnv = env as Env
 

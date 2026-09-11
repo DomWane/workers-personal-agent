@@ -1,6 +1,6 @@
 import { fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { tavilySearch } from '../../src/connectors/tavily.connector'
+import { tavilySearch } from '@/connectors/tavily.connector'
 
 beforeAll(() => {
   fetchMock.activate()

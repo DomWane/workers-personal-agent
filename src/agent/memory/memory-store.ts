@@ -1,4 +1,4 @@
-import type { Thread } from '../../types'
+import type { Thread } from '@/types'
 export interface MemoryEntry {
   name: string
   description: string

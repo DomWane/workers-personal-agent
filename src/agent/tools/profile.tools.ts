@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { createMemoryStore } from '../memory/vault-store'
-import { checkGrounds, groundsFields } from './grounds'
-import { defineTool, type ToolDef } from './registry'
+import { createMemoryStore } from '@/agent/memory/vault-store'
+import { checkGrounds, groundsFields } from '@/agent/tools/grounds'
+import { defineTool, type ToolDef } from '@/agent/tools/registry'
 
 export const profileTools: ToolDef[] = [
   defineTool({

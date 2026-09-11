@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { slugify } from '../../src/agent/memory/vault-format'
-import { VaultStore, sanitize } from '../../src/agent/memory/vault-store'
-import type { VaultBackend } from '../../src/agent/memory/vault-store'
+import { slugify } from '@/agent/memory/vault-format'
+import { VaultStore, sanitize } from '@/agent/memory/vault-store'
+import type { VaultBackend } from '@/agent/memory/vault-store'
 
 function fakeBackend(files: Record<string, { content: string; sha: string; meta?: Record<string, string> }>) {
   return {

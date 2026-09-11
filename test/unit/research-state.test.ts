@@ -24,8 +24,8 @@ import {
   shouldContinue,
   startResearch,
   type RoundResult,
-} from '../../src/agent/research/state'
-import type { ResearchState } from '../../src/types'
+} from '@/agent/research/state'
+import type { ResearchState } from '@/types'
 
 const RUN = 'run-1'
 /** Measured over three real runs: 28, 31 and 32 subrequests for a round that used all six loop rounds. */

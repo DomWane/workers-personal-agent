@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { ORPHAN_LOG } from '../log'
-import { defineTool, type ToolDef } from './registry'
+import { ORPHAN_LOG } from '@/agent/log'
+import { defineTool, type ToolDef } from '@/agent/tools/registry'
 
 const MAX_REPORT_CHARS = 40_000
 

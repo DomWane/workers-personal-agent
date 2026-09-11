@@ -1,6 +1,6 @@
 import { fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { fetchPageMarkdown } from '../../src/connectors/browser-run.connector'
+import { fetchPageMarkdown } from '@/connectors/browser-run.connector'
 
 beforeAll(() => {
   fetchMock.activate()

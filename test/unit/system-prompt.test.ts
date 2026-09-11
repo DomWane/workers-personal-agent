@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSystemPrompt, renderSkillIndex } from '../../src/agent/system-prompt'
+import { buildSystemPrompt, renderSkillIndex } from '@/agent/system-prompt'
 
 /**
  * The one place the assembled prompt is pinned verbatim. Everything else that touches it asserts a

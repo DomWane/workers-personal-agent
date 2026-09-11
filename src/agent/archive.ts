@@ -1,5 +1,5 @@
-import type { SqlTag } from './memory/embedding-index'
-import type { HistoryMessage } from '../types'
+import type { SqlTag } from '@/agent/memory/embedding-index'
+import type { HistoryMessage } from '@/types'
 
 export function sqlTag(sql: SqlStorage): SqlTag {
   return (<T>(strings: TemplateStringsArray, ...values: unknown[]) =>

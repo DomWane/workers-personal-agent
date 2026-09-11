@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractMain } from '../../src/agent/tools/page-text'
+import { extractMain } from '@/agent/tools/page-text'
 
 const ARTICLE = [
   'Andrej Karpathy popisuje, jak používá jazykové modely v každodenní práci, a rozděluje',

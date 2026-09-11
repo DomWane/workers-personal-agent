@@ -1,11 +1,11 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { getAgentByName } from 'agents'
-import { readArchive, sqlTag } from '../../src/agent/archive'
-import type { PersonalAgent } from '../../src/agent/personal-agent'
-import type { ResearchScout } from '../../src/agent/research/scout'
-import { proposeResearch, startResearch } from '../../src/agent/research/state'
-import type { Env } from '../../src/types'
+import { readArchive, sqlTag } from '@/agent/archive'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import type { ResearchScout } from '@/agent/research/scout'
+import { proposeResearch, startResearch } from '@/agent/research/state'
+import type { Env } from '@/types'
 import { requestBody } from '../helpers/request'
 
 /**

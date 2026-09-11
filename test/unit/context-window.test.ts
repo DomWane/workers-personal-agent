@@ -7,8 +7,8 @@ import {
   isContextOverflow,
   planCompaction,
   resultCap,
-} from '../../src/agent/loop/context-window'
-import type { HistoryMessage } from '../../src/types'
+} from '@/agent/loop/context-window'
+import type { HistoryMessage } from '@/types'
 
 /** 30 chars ≈ 10 tokens at the fallback rate, so a count of messages is a count of tokens × 10. */
 function messages(n: number): HistoryMessage[] {

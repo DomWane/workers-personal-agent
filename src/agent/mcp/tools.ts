@@ -1,6 +1,6 @@
-import type { ToolDef } from '../tools/registry'
-import type { TurnLog } from '../log'
-import type { McpCallResult, McpToolView } from '../../types'
+import type { ToolDef } from '@/agent/tools/registry'
+import type { TurnLog } from '@/agent/log'
+import type { McpCallResult, McpToolView } from '@/types'
 
 const SANITIZE = /[^A-Za-z0-9_]/g
 const MAX_NAME = 64

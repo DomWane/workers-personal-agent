@@ -1,13 +1,13 @@
 import { env, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { describe, expect, it } from 'vitest'
-import type { PersonalAgent } from '../../src/agent/personal-agent'
-import { appendArchive } from '../../src/agent/archive'
-import { sqlTag } from '../../src/agent/archive'
-import { truncate, type ToolContext, type ToolDef } from '../../src/agent/tools/registry'
-import { resultCap } from '../../src/agent/loop/context-window'
-import { MAX_READBACK_CHARS, toolArchiveTools } from '../../src/agent/tools/tool-archive.tools'
-import type { Env } from '../../src/types'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import { appendArchive } from '@/agent/archive'
+import { sqlTag } from '@/agent/archive'
+import { truncate, type ToolContext, type ToolDef } from '@/agent/tools/registry'
+import { resultCap } from '@/agent/loop/context-window'
+import { MAX_READBACK_CHARS, toolArchiveTools } from '@/agent/tools/tool-archive.tools'
+import type { Env } from '@/types'
 
 const testEnv = env as Env
 

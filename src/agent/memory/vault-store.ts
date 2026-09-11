@@ -1,5 +1,5 @@
-import { R2VaultConnector } from '../../connectors/r2-vault.connector'
-import type { Env, Thread } from '../../types'
+import { R2VaultConnector } from '@/connectors/r2-vault.connector'
+import type { Env, Thread } from '@/types'
 import type {
   IndexedKind,
   MemoryEntry,
@@ -8,7 +8,7 @@ import type {
   ProfileOp,
   SkillEntry,
   SkillMeta,
-} from './memory-store'
+} from '@/agent/memory/memory-store'
 import {
   MAX_CONTENT_CHARS,
   parseFrontmatter,
@@ -19,7 +19,7 @@ import {
   slugCandidates,
   slugify,
   toSkillMeta,
-} from './vault-format'
+} from '@/agent/memory/vault-format'
 
 const INDEX_HEADER = '# Agent memory'
 const MAX_MEMORY_RESULTS = 3

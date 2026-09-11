@@ -1,7 +1,11 @@
+import { fileURLToPath, URL } from 'node:url'
 import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config'
 import { defaultExclude } from 'vitest/config'
 
 export default defineWorkersConfig({
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
   test: {
     // evals/ has its own vitest.evals.config.ts: eval code uses fs/process, which the
     // Workers pool does not provide, so those tests must never run in this pool.

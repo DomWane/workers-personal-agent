@@ -1,4 +1,4 @@
-import type { SearchFilters } from './tavily.connector'
+import type { SearchFilters } from '@/connectors/tavily.connector'
 
 const TIMEOUT_MS = 10_000
 

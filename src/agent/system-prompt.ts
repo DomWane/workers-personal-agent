@@ -1,4 +1,4 @@
-import type { SkillMeta } from './memory/memory-store'
+import type { SkillMeta } from '@/agent/memory/memory-store'
 
 const BASE_PROMPT = `You are the user's personal AI assistant, chatting with them in a private web chat.
 

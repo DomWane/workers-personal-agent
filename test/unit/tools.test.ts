@@ -1,10 +1,10 @@
 import { env, fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { ARCHIVE_MIN_CHARS } from '../../src/agent/loop/tool-loop'
-import { buildTools } from '../../src/agent/tools'
-import { MAX_PAGE_CHARS } from '../../src/agent/tools/browser.tools'
-import type { CitationVerdict } from '../../src/agent/provenance'
+import { ARCHIVE_MIN_CHARS } from '@/agent/loop/tool-loop'
+import { buildTools } from '@/agent/tools'
+import { MAX_PAGE_CHARS } from '@/agent/tools/browser.tools'
+import type { CitationVerdict } from '@/agent/provenance'
 import {
   DEFAULT_RESULT_CHARS,
   pageKey,
@@ -12,9 +12,9 @@ import {
   type ScheduleInfo,
   type ToolContext,
   type ToolDef,
-} from '../../src/agent/tools/registry'
-import { MAX_SCHEDULED_TASKS } from '../../src/agent/tools/schedule.tools'
-import type { Env } from '../../src/types'
+} from '@/agent/tools/registry'
+import { MAX_SCHEDULED_TASKS } from '@/agent/tools/schedule.tools'
+import type { Env } from '@/types'
 import { readVault, seedVault } from '../helpers/vault'
 
 beforeAll(() => {

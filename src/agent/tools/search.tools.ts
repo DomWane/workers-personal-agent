@@ -1,10 +1,10 @@
 import { z } from 'zod'
-import { firecrawlSearch } from '../../connectors/firecrawl.connector'
-import { tavilySearch, type SearchFilters, type SearchResult } from '../../connectors/tavily.connector'
-import type { Env } from '../../types'
-import { ORPHAN_LOG } from '../log'
-import { defineTool, pageKey, type ToolDef } from './registry'
-import { rethrowIfExhausted } from '../subrequest-budget'
+import { firecrawlSearch } from '@/connectors/firecrawl.connector'
+import { tavilySearch, type SearchFilters, type SearchResult } from '@/connectors/tavily.connector'
+import type { Env } from '@/types'
+import { ORPHAN_LOG } from '@/agent/log'
+import { defineTool, pageKey, type ToolDef } from '@/agent/tools/registry'
+import { rethrowIfExhausted } from '@/agent/subrequest-budget'
 
 interface SearchOutcome {
   results: SearchResult[]

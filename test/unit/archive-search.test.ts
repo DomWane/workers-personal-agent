@@ -1,8 +1,8 @@
 import { env, runInDurableObject } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
-import { appendArchive, searchToolResults, type ToolResultRecord } from '../../src/agent/archive'
-import { sqlTag } from '../../src/agent/archive'
-import type { Env } from '../../src/types'
+import { appendArchive, searchToolResults, type ToolResultRecord } from '@/agent/archive'
+import { sqlTag } from '@/agent/archive'
+import type { Env } from '@/types'
 
 /**
  * Against real Durable Object SQLite rather than a fake, because the whole point of this search is

@@ -1,9 +1,9 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { type PersonalAgent } from '../../src/agent/personal-agent'
-import type { Env } from '../../src/types'
-import { VaultStore } from '../../src/agent/memory/vault-store'
+import { type PersonalAgent } from '@/agent/personal-agent'
+import type { Env } from '@/types'
+import { VaultStore } from '@/agent/memory/vault-store'
 import { seedVault } from '../helpers/vault'
 
 beforeAll(() => {

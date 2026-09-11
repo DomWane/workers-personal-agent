@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
-import { R2VaultConnector } from '../../src/connectors/r2-vault.connector'
-import type { Env } from '../../src/types'
+import { R2VaultConnector } from '@/connectors/r2-vault.connector'
+import type { Env } from '@/types'
 
 const vault = () => new R2VaultConnector((env as Env).VAULT)
 

@@ -1,11 +1,11 @@
 import { z } from 'zod'
-import type { TurnLog } from '../log'
-import type { MemoryIndex } from '../memory/embedding-index'
-import type { MemorySource } from '../memory/memory-store'
-import type { CitationVerdict } from '../provenance'
-import type { SubrequestBudget } from '../subrequest-budget'
-import type { ToolResultMatch, ToolResultRecord } from '../archive'
-import type { Env } from '../../types'
+import type { TurnLog } from '@/agent/log'
+import type { MemoryIndex } from '@/agent/memory/embedding-index'
+import type { MemorySource } from '@/agent/memory/memory-store'
+import type { CitationVerdict } from '@/agent/provenance'
+import type { SubrequestBudget } from '@/agent/subrequest-budget'
+import type { ToolResultMatch, ToolResultRecord } from '@/agent/archive'
+import type { Env } from '@/types'
 
 export interface ToolArchive {
   save(record: ToolResultRecord): number

@@ -1,8 +1,8 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import type { PersonalAgent } from '../../src/agent/personal-agent'
-import type { Env, WebMessagePayload } from '../../src/types'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import type { Env, WebMessagePayload } from '@/types'
 
 beforeAll(() => {
   fetchMock.activate()

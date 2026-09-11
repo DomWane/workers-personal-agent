@@ -1,4 +1,4 @@
-import type { VaultEntry, VaultMeta } from '../agent/memory/vault-store'
+import type { VaultEntry, VaultMeta } from '@/agent/memory/vault-store'
 
 export class R2VaultConnector {
   constructor(private bucket: R2Bucket) {}

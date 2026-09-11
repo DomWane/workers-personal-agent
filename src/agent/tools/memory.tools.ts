@@ -1,10 +1,10 @@
 import { z } from 'zod'
-import { errorFields } from '../log'
-import type { IndexedKind, MemoryEntry, MemoryStore } from '../memory/memory-store'
-import { slugify } from '../memory/vault-format'
-import { createMemoryStore } from '../memory/vault-store'
-import { checkGrounds, groundsFields } from './grounds'
-import { defineTool, type ToolContext, type ToolDef } from './registry'
+import { errorFields } from '@/agent/log'
+import type { IndexedKind, MemoryEntry, MemoryStore } from '@/agent/memory/memory-store'
+import { slugify } from '@/agent/memory/vault-format'
+import { createMemoryStore } from '@/agent/memory/vault-store'
+import { checkGrounds, groundsFields } from '@/agent/tools/grounds'
+import { defineTool, type ToolContext, type ToolDef } from '@/agent/tools/registry'
 
 function renderEntries(entries: MemoryEntry[]): string {
   return entries

@@ -8,10 +8,10 @@ import {
   EmbeddingIndex,
   reindexInto,
   serializeVec,
-} from '../../src/agent/memory/embedding-index'
-import type { SqlTag } from '../../src/agent/memory/embedding-index'
-import type { PersonalAgent } from '../../src/agent/personal-agent'
-import type { Env } from '../../src/types'
+} from '@/agent/memory/embedding-index'
+import type { SqlTag } from '@/agent/memory/embedding-index'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import type { Env } from '@/types'
 
 describe('cosineSimilarity', () => {
   it('is 1 for identical, 0 for orthogonal, and handles zero vectors', () => {

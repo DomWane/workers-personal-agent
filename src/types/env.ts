@@ -1,8 +1,8 @@
-import type { PersonalAgent } from '../agent/personal-agent'
-import type { MaintenanceAgent } from '../agent/maintenance-agent'
-import type { ResearchScout } from '../agent/research/scout'
-import type { McpRegistry } from '../agent/mcp/registry'
-import type { McpClient } from '../agent/mcp/client'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import type { MaintenanceAgent } from '@/agent/maintenance-agent'
+import type { ResearchScout } from '@/agent/research/scout'
+import type { McpRegistry } from '@/agent/mcp/registry'
+import type { McpClient } from '@/agent/mcp/client'
 
 export interface Env {
   PERSONAL_AGENT: DurableObjectNamespace<PersonalAgent>

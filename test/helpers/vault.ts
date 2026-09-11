@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:test'
-import type { Env } from '../../src/types'
+import type { Env } from '@/types'
 
 /**
  * Seeds the R2 vault for a test. The suite used to register GitHub HTTP interceptors for

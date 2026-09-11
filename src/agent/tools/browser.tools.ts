@@ -1,10 +1,10 @@
 import { z } from 'zod'
-import { fetchPageMarkdown } from '../../connectors/browser-run.connector'
-import { firecrawlScrape } from '../../connectors/firecrawl.connector'
-import { ORPHAN_LOG, type TurnLog } from '../log'
-import { extractMain } from './page-text'
-import { defineTool, pageKey, type ToolDef } from './registry'
-import { rethrowIfExhausted } from '../subrequest-budget'
+import { fetchPageMarkdown } from '@/connectors/browser-run.connector'
+import { firecrawlScrape } from '@/connectors/firecrawl.connector'
+import { ORPHAN_LOG, type TurnLog } from '@/agent/log'
+import { extractMain } from '@/agent/tools/page-text'
+import { defineTool, pageKey, type ToolDef } from '@/agent/tools/registry'
+import { rethrowIfExhausted } from '@/agent/subrequest-budget'
 
 export const MAX_PAGE_CHARS = 100_000
 

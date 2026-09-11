@@ -1,5 +1,5 @@
-import { llmConfig } from './llm-config'
-import type { Env, ModelRow } from '../types'
+import { llmConfig } from '@/agent/llm-config'
+import type { Env, ModelRow } from '@/types'
 
 interface CloudflareModel {
   name?: string

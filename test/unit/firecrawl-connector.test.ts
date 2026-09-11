@@ -1,6 +1,6 @@
 import { fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { firecrawlScrape, firecrawlSearch } from '../../src/connectors/firecrawl.connector'
+import { firecrawlScrape, firecrawlSearch } from '@/connectors/firecrawl.connector'
 
 beforeAll(() => {
   fetchMock.activate()

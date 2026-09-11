@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BudgetExhausted, FREE_PLAN_SUBREQUESTS, SubrequestBudget } from '../../src/agent/subrequest-budget'
+import { BudgetExhausted, FREE_PLAN_SUBREQUESTS, SubrequestBudget } from '@/agent/subrequest-budget'
 
 describe('SubrequestBudget', () => {
   it('defaults to the Free plan cap', () => {

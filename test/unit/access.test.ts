@@ -1,7 +1,7 @@
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import worker from '../../src/index'
-import type { Env } from '../../src/types'
+import worker from '@/index'
+import type { Env } from '@/types'
 
 afterEach(() => vi.restoreAllMocks())
 

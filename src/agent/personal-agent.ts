@@ -1,11 +1,11 @@
 import { Agent, callable, getAgentByName } from 'agents'
 import type OpenAI from 'openai'
-import { createLlmClient } from '../connectors/llm.connector'
-import { llmConfig } from './llm-config'
-import type { SqlTag } from './memory/embedding-index'
-import { threadOf } from './agent-name'
-import { INDEX_INSTANCE } from './maintenance-agent'
-import { createMemoryStore } from './memory/vault-store'
+import { createLlmClient } from '@/connectors/llm.connector'
+import { llmConfig } from '@/agent/llm-config'
+import type { SqlTag } from '@/agent/memory/embedding-index'
+import { threadOf } from '@/agent/agent-name'
+import { INDEX_INSTANCE } from '@/agent/maintenance-agent'
+import { createMemoryStore } from '@/agent/memory/vault-store'
 import {
   appendArchive,
   dropArchive,
@@ -13,21 +13,21 @@ import {
   toolArchiveOver,
   type CompactionRecord,
   type FeedbackRecord,
-} from './archive'
-import { historyForTurn, isContextOverflow, pairedOnly, spoken } from './loop/context-window'
-import * as compaction from './loop/history-compaction'
-import { mcpRegistry } from './mcp/registry'
-import type { McpClientRpc } from './mcp/client'
-import { buildMcpTools } from './mcp/tools'
-import { verdictFor, type CitationVerdict } from './provenance'
-import { buildSystemPrompt, renderSkillIndex } from './system-prompt'
-import { contentEnabled, createLog, errorFields, ORPHAN_LOG, type LogSource, type TurnLog } from './log'
-import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from './subrequest-budget'
-import { cachedSubrequestLimit } from './workers-plan'
-import * as research from './research/commands'
-import { runToolLoop, turnToolTraffic, type StopReason } from './loop/tool-loop'
-import { buildTools } from './tools'
-import type { ToolContext, ToolDef } from './tools/registry'
+} from '@/agent/archive'
+import { historyForTurn, isContextOverflow, pairedOnly, spoken } from '@/agent/loop/context-window'
+import * as compaction from '@/agent/loop/history-compaction'
+import { mcpRegistry } from '@/agent/mcp/registry'
+import type { McpClientRpc } from '@/agent/mcp/client'
+import { buildMcpTools } from '@/agent/mcp/tools'
+import { verdictFor, type CitationVerdict } from '@/agent/provenance'
+import { buildSystemPrompt, renderSkillIndex } from '@/agent/system-prompt'
+import { contentEnabled, createLog, errorFields, ORPHAN_LOG, type LogSource, type TurnLog } from '@/agent/log'
+import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from '@/agent/subrequest-budget'
+import { cachedSubrequestLimit } from '@/agent/workers-plan'
+import * as research from '@/agent/research/commands'
+import { runToolLoop, turnToolTraffic, type StopReason } from '@/agent/loop/tool-loop'
+import { buildTools } from '@/agent/tools'
+import type { ToolContext, ToolDef } from '@/agent/tools/registry'
 import type {
   AgentState,
   ChatMessage,
@@ -38,7 +38,7 @@ import type {
   ScoutCounts,
   TaskPayload,
   WebMessagePayload,
-} from '../types'
+} from '@/types'
 
 interface TurnOutcome {
   reply: string

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { historyForTurn, pairedOnly, spoken } from '../../src/agent/loop/context-window'
-import type { TurnLog } from '../../src/agent/log'
-import type { HistoryMessage } from '../../src/types'
+import { historyForTurn, pairedOnly, spoken } from '@/agent/loop/context-window'
+import type { TurnLog } from '@/agent/log'
+import type { HistoryMessage } from '@/types'
 
 const user = (id: string): HistoryMessage => ({ role: 'user', content: `q ${id}`, id })
 const answer = (id: string): HistoryMessage => ({ role: 'assistant', content: `a ${id}`, id })

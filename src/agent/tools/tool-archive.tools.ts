@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { defineTool, recoverableAt, type ToolDef } from './registry'
-import { resultCap } from '../loop/context-window'
+import { defineTool, recoverableAt, type ToolDef } from '@/agent/tools/registry'
+import { resultCap } from '@/agent/loop/context-window'
 
 const WINDOW_CHARS = 40_000
 

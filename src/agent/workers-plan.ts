@@ -1,6 +1,6 @@
-import { FREE_PLAN_SUBREQUESTS, PAID_PLAN_SUBREQUESTS } from './subrequest-budget'
-import { errorFields, type TurnLog } from './log'
-import type { Env } from '../types'
+import { FREE_PLAN_SUBREQUESTS, PAID_PLAN_SUBREQUESTS } from '@/agent/subrequest-budget'
+import { errorFields, type TurnLog } from '@/agent/log'
+import type { Env } from '@/types'
 
 const WORKERS_PAID_PLAN = 'workers_paid'
 

@@ -1,12 +1,12 @@
 import { env, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { describe, expect, it } from 'vitest'
-import { threadId } from '../../src/agent/agent-name'
-import { appendArchive } from '../../src/agent/archive'
-import { sqlTag } from '../../src/agent/archive'
-import { createMemoryStore } from '../../src/agent/memory/vault-store'
-import type { PersonalAgent } from '../../src/agent/personal-agent'
-import type { Env } from '../../src/types'
+import { threadId } from '@/agent/agent-name'
+import { appendArchive } from '@/agent/archive'
+import { sqlTag } from '@/agent/archive'
+import { createMemoryStore } from '@/agent/memory/vault-store'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import type { Env } from '@/types'
 import { seedVault } from '../helpers/vault'
 
 const testEnv = env as Env

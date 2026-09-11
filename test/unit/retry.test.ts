@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { retryOnce } from '../../src/agent/retry'
+import { retryOnce } from '@/agent/retry'
 
 describe('retryOnce', () => {
   it('does not retry work that succeeded', async () => {

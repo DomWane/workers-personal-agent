@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import type { ReminderPayload, TaskPayload } from '../../types'
-import { defineTool, type SchedulerLike, type ToolDef } from './registry'
+import type { ReminderPayload, TaskPayload } from '@/types'
+import { defineTool, type SchedulerLike, type ToolDef } from '@/agent/tools/registry'
 
 const CRON_RE = /^[\d*/,-]+ [\d*/,-]+ [\d*/,-]+ [\d*/,-]+ [\d*/,-]+$/
 

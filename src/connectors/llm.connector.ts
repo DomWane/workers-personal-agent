@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import type { ChatMessage, ToolCall } from '../types'
+import type { ChatMessage, ToolCall } from '@/types'
 
 export function createLlmClient(apiKey: string, baseURL: string, doFetch?: typeof globalThis.fetch): OpenAI {
   return new OpenAI({ apiKey, baseURL, maxRetries: 0, ...(doFetch ? { fetch: doFetch } : {}) })

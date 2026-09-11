@@ -1,15 +1,15 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { createMemoryStore } from '../../src/agent/memory/vault-store'
-import { PersonalAgent } from '../../src/agent/personal-agent'
+import { createMemoryStore } from '@/agent/memory/vault-store'
+import { PersonalAgent } from '@/agent/personal-agent'
 import {
   proposeResearch,
   RESEARCH_DEADLINE_MS,
   RESEARCH_SUBREQUEST_BUDGET,
   startResearch,
-} from '../../src/agent/research/state'
-import type { Env } from '../../src/types'
+} from '@/agent/research/state'
+import type { Env } from '@/types'
 import { requestBody } from '../helpers/request'
 import { listVault, readVault } from '../helpers/vault'
 

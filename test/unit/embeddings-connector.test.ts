@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { embedText } from '../../src/connectors/embeddings.connector'
+import { embedText } from '@/connectors/embeddings.connector'
 
 describe('embedText', () => {
   it('refuses to silently truncate: over-long input errors instead of losing its tail', async () => {

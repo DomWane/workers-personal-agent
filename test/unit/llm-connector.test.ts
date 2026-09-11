@@ -1,6 +1,6 @@
 import { fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { chatCompletion, chatCompletionWithTools, createLlmClient } from '../../src/connectors/llm.connector'
+import { chatCompletion, chatCompletionWithTools, createLlmClient } from '@/connectors/llm.connector'
 
 beforeAll(() => {
   fetchMock.activate()

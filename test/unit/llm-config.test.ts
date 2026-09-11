@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { llmConfig } from '../../src/agent/llm-config'
-import type { Env } from '../../src/types'
+import { llmConfig } from '@/agent/llm-config'
+import type { Env } from '@/types'
 
 function makeEnv(over: Partial<Env>): Env {
   return { CF_ACCOUNT_ID: 'acct-1', CF_API_TOKEN: 'cf-token', ...over } as Env

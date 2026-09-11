@@ -1,12 +1,12 @@
 import { fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { createLlmClient } from '../../src/connectors/llm.connector'
-import { createLog, type TurnLog } from '../../src/agent/log'
-import { FINAL_ANSWER_RESERVE, PRUNE_OVER_CHARS, runToolLoop, turnToolTraffic } from '../../src/agent/loop/tool-loop'
-import { resultCap } from '../../src/agent/loop/context-window'
-import { rethrowIfExhausted, SubrequestBudget } from '../../src/agent/subrequest-budget'
-import { defineTool, type ToolContext, type ToolDef } from '../../src/agent/tools/registry'
+import { createLlmClient } from '@/connectors/llm.connector'
+import { createLog, type TurnLog } from '@/agent/log'
+import { FINAL_ANSWER_RESERVE, PRUNE_OVER_CHARS, runToolLoop, turnToolTraffic } from '@/agent/loop/tool-loop'
+import { resultCap } from '@/agent/loop/context-window'
+import { rethrowIfExhausted, SubrequestBudget } from '@/agent/subrequest-budget'
+import { defineTool, type ToolContext, type ToolDef } from '@/agent/tools/registry'
 
 beforeAll(() => {
   fetchMock.activate()

@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import type { MemorySource } from '../memory/memory-store'
-import { explainRefusal } from '../provenance'
-import type { ToolContext } from './registry'
+import type { MemorySource } from '@/agent/memory/memory-store'
+import { explainRefusal } from '@/agent/provenance'
+import type { ToolContext } from '@/agent/tools/registry'
 
 export function groundsFields(opts: { citedTurn: string; thread: string }) {
   return {

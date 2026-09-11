@@ -1,4 +1,4 @@
-import type { MemoryStore } from './memory-store'
+import type { MemoryStore } from '@/agent/memory/memory-store'
 
 export type SqlTag = <T = Record<string, unknown>>(strings: TemplateStringsArray, ...values: unknown[]) => T[]
 

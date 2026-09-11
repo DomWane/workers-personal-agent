@@ -1,10 +1,10 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { mcpRegistry } from '../../src/agent/mcp/registry'
-import type { McpClientRpc } from '../../src/agent/mcp/client'
-import type { PersonalAgent } from '../../src/agent/personal-agent'
-import type { Env } from '../../src/types'
+import { mcpRegistry } from '@/agent/mcp/registry'
+import type { McpClientRpc } from '@/agent/mcp/client'
+import type { PersonalAgent } from '@/agent/personal-agent'
+import type { Env } from '@/types'
 import { CONNECT_GETS, CONNECT_POSTS, mockMcpServer } from '../helpers/mcp-server'
 
 beforeAll(() => {

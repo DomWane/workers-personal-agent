@@ -1,6 +1,6 @@
 import type OpenAI from 'openai'
-import { chatCompletion } from '../connectors/llm.connector'
-import type { HistoryMessage } from '../types'
+import { chatCompletion } from '@/connectors/llm.connector'
+import type { HistoryMessage } from '@/types'
 
 export function transcript(messages: HistoryMessage[], opts: { labels?: boolean } = {}): string {
   return messages
