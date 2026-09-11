@@ -1,7 +1,7 @@
 import type { AgentState, HistoryMessage } from '@/types'
 
 /**
- * Duplicated from `src/agent/context-window.ts` rather than asked for over an RPC: the confirm
+ * Duplicated from `src/agent/loop/context-window.ts` rather than asked for over an RPC: the confirm
  * dialog answers "would this switch compact?" about a model the server has never seen, whose window
  * only the browser's catalogue knows. Nothing keeps the two in step, and a wrong prediction only
  * means the dialog asks when it need not.
@@ -20,7 +20,7 @@ export function spoken(messages: HistoryMessage[]): HistoryMessage[] {
   return messages.filter((m) => m.role !== 'tool' && !m.tool_calls?.length)
 }
 
-/** Mirrors `messageTokens` in `src/agent/context-window.ts`. The two copies drifted apart twice on
+/** Mirrors `messageTokens` in `src/agent/loop/context-window.ts`. The two copies drifted apart twice on
  *  the day the fraction changed, which is the standing cost of this file existing. */
 function callChars(m: HistoryMessage): number {
   if (m.role === 'tool') {

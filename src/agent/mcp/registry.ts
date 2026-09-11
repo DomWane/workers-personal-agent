@@ -1,8 +1,8 @@
 import { DurableObject } from 'cloudflare:workers'
 import { normalizeServerId } from 'agents/mcp/client'
-import { sqlTag } from './archive'
-import type { SqlTag } from './memory/embedding-index'
-import type { Env } from '../types'
+import { sqlTag } from '../archive'
+import type { SqlTag } from '../memory/embedding-index'
+import type { Env } from '../../types'
 
 export const MCP_REGISTRY_INSTANCE = 'mcp-registry'
 

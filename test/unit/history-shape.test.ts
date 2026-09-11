@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { historyForTurn, pairedOnly, spoken } from '../../src/agent/context-window'
+import { historyForTurn, pairedOnly, spoken } from '../../src/agent/loop/context-window'
 import type { TurnLog } from '../../src/agent/log'
 import type { HistoryMessage } from '../../src/types'
 

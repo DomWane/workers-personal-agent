@@ -5,8 +5,8 @@ import {
   formatResearchProposal,
   parseRoundOutput,
   ungroundedCitations,
-} from '../../src/agent/research-round'
-import { RESEARCH_SUBREQUEST_BUDGET, applyRound, proposeResearch, startResearch } from '../../src/agent/research-state'
+} from '../../src/agent/research/round'
+import { RESEARCH_SUBREQUEST_BUDGET, applyRound, proposeResearch, startResearch } from '../../src/agent/research/state'
 import type { ResearchState } from '../../src/types'
 
 const running = (over: Partial<ResearchState> = {}): ResearchState => ({

@@ -1,7 +1,7 @@
 import { env, fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { ARCHIVE_MIN_CHARS } from '../../src/agent/tool-loop'
+import { ARCHIVE_MIN_CHARS } from '../../src/agent/loop/tool-loop'
 import { buildTools } from '../../src/agent/tools'
 import { MAX_PAGE_CHARS } from '../../src/agent/tools/browser.tools'
 import type { CitationVerdict } from '../../src/agent/provenance'

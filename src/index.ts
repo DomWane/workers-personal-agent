@@ -1,8 +1,8 @@
 import { getAgentByName, routeAgentRequest } from 'agents'
 import { threadId, webAgentName, WEB_IDENTITY } from './agent/agent-name'
 import { INDEX_INSTANCE, REFLECTION_INSTANCE } from './agent/maintenance-agent'
-import { mcpRegistry, type McpResult } from './agent/mcp-registry'
-import type { McpClientRpc } from './agent/mcp-client'
+import { mcpRegistry, type McpResult } from './agent/mcp/registry'
+import type { McpClientRpc } from './agent/mcp/client'
 import { createMemoryStore } from './agent/memory/vault-store'
 import { llmConfig } from './agent/llm-config'
 import { readModels } from './agent/model-catalogue'
@@ -10,9 +10,9 @@ import type { AgentState, Env, ModelRow } from './types'
 
 export { PersonalAgent } from './agent/personal-agent'
 export { MaintenanceAgent } from './agent/maintenance-agent'
-export { ResearchScout } from './agent/research-scout'
-export { McpRegistry } from './agent/mcp-registry'
-export { McpClient } from './agent/mcp-client'
+export { ResearchScout } from './agent/research/scout'
+export { McpRegistry } from './agent/mcp/registry'
+export { McpClient } from './agent/mcp/client'
 
 function accessRefusal(request: Request, env: Env): Response | undefined {
   if (env.ENVIRONMENT === 'localhost') {

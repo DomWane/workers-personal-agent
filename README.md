@@ -198,13 +198,13 @@ src/
   index.ts                 Worker: routing, the Access gate, the model catalogue
   agent/
     personal-agent.ts      one Durable Object per thread
-    tool-loop.ts           the loop, tool results, pruning
-    research-*.ts          proposal, wave of scouts, rounds, report
-    history-compaction.ts  compaction, with context-window.ts for the arithmetic
     maintenance-agent.ts   the embedding index and the nightly reflection
-    mcp-client.ts          MCP servers, with mcp-registry.ts for their tool catalog
+    loop/                  the tool loop, context-window arithmetic, compaction
+    research/              proposal, wave of scouts, rounds, report
+    mcp/                   MCP servers as Durable Objects, their tool catalog
     memory/                R2 vault, markdown format, embedding index
     tools/                 one file per tool family, zod schemas
+  types/                   state and wire shapes, shared with the web client
   connectors/              LLM, Tavily, Firecrawl, Browser Rendering, R2
 web/src/                   Vue 3 client, shadcn-vue and ai-elements-vue components
 evals/                     retrieval and prompt evals, own vitest pool

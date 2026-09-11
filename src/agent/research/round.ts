@@ -1,7 +1,7 @@
-import type { TurnLog } from './log'
-import { presetOf, RESEARCH_SUBREQUEST_BUDGET } from './research-state'
-import { pageKey } from './tools/registry'
-import type { ResearchState } from '../types'
+import type { TurnLog } from '../log'
+import { presetOf, RESEARCH_SUBREQUEST_BUDGET } from './state'
+import { pageKey } from '../tools/registry'
+import type { ResearchState } from '../../types'
 
 const VISITED_SHOWN = 30
 

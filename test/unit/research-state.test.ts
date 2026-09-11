@@ -24,7 +24,7 @@ import {
   shouldContinue,
   startResearch,
   type RoundResult,
-} from '../../src/agent/research-state'
+} from '../../src/agent/research/state'
 import type { ResearchState } from '../../src/types'
 
 const RUN = 'run-1'

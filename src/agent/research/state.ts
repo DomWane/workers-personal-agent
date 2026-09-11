@@ -1,4 +1,4 @@
-import type { ResearchPreset, ResearchState, StopCause } from '../types'
+import type { ResearchPreset, ResearchState, StopCause } from '../../types'
 
 export const RESEARCH_SUBREQUEST_BUDGET = 402
 

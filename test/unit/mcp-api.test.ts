@@ -2,7 +2,7 @@ import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from '
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import worker, { McpClient } from '../../src/index'
 import type { Env } from '../../src/types'
-import type { McpServerView } from '../../src/agent/mcp-registry'
+import type { McpServerView } from '../../src/agent/mcp/registry'
 import { CONNECT_GETS, CONNECT_POSTS, mockMcpServer } from '../helpers/mcp-server'
 
 beforeAll(() => {

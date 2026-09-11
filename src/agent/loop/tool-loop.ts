@@ -1,13 +1,13 @@
 import type OpenAI from 'openai'
 import { z } from 'zod'
-import { chatCompletionWithTools } from '../connectors/llm.connector'
-import type { CompletionResult } from '../connectors/llm.connector'
-import { errorFields, ORPHAN_LOG } from './log'
-import type { TurnLog } from './log'
+import { chatCompletionWithTools } from '../../connectors/llm.connector'
+import type { CompletionResult } from '../../connectors/llm.connector'
+import { errorFields, ORPHAN_LOG } from '../log'
+import type { TurnLog } from '../log'
 import { pairedOnly, resultCap } from './context-window'
-import { retryOnce } from './retry'
-import { BudgetExhausted, type SubrequestBudget } from './subrequest-budget'
-import type { ChatMessage, HistoryMessage } from '../types'
+import { retryOnce } from '../retry'
+import { BudgetExhausted, type SubrequestBudget } from '../subrequest-budget'
+import type { ChatMessage, HistoryMessage } from '../../types'
 import {
   DEFAULT_RESULT_CHARS,
   recoverableAt,
@@ -16,7 +16,7 @@ import {
   truncate,
   type ToolContext,
   type ToolDef,
-} from './tools/registry'
+} from '../tools/registry'
 
 const EMPTY_REPLY_FALLBACK = '(no answer produced — try rephrasing)'
 

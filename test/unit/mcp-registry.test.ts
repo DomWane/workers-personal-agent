@@ -1,6 +1,6 @@
 import { env, runInDurableObject } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
-import { MCP_REGISTRY_INSTANCE, type McpRegistry } from '../../src/agent/mcp-registry'
+import { MCP_REGISTRY_INSTANCE, type McpRegistry } from '../../src/agent/mcp/registry'
 import type { Env } from '../../src/types'
 
 const testEnv = env as Env

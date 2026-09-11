@@ -8,7 +8,7 @@ import {
   RESEARCH_DEADLINE_MS,
   RESEARCH_SUBREQUEST_BUDGET,
   startResearch,
-} from '../../src/agent/research-state'
+} from '../../src/agent/research/state'
 import type { Env } from '../../src/types'
 import { requestBody } from '../helpers/request'
 import { listVault, readVault } from '../helpers/vault'
