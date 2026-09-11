@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildMcpTools, mcpToolName, type McpCall } from '../../src/agent/mcp/tools'
-import type { McpToolView } from '../../src/agent/mcp/registry'
+import type { McpToolView } from '../../src/types'
 import { buildTools } from '../../src/agent/tools'
 
 const call: McpCall = async (serverId, name, args) => ({

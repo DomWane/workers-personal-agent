@@ -1,6 +1,7 @@
 export type { AgentState } from './agent-state'
 export type { ChatMessage, HistoryMessage, ToolCall } from './chat'
 export type { Env } from './env'
+export type { McpCallResult, McpResult, McpServerReport, McpServerState, McpServerView, McpToolView } from './mcp'
 export type { ModelRow } from './models'
 export type { ResearchPreset, ResearchState, ScoutCounts, ScoutProgress, StopCause } from './research'
 export type { Thread } from './threads'

@@ -1,6 +1,6 @@
 import { Agent } from 'agents'
-import { mcpRegistry, type McpCallResult, type McpResult, type McpServerReport, type McpServerView } from './registry'
-import type { Env } from '../../types'
+import { mcpRegistry } from './registry'
+import type { Env, McpCallResult, McpResult, McpServerReport, McpServerView } from '../../types'
 
 export interface McpClientConfig {
   id: string

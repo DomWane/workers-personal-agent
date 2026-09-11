@@ -1,26 +1,11 @@
-/** Mirrors `McpServerView` and the `/api/mcp` replies in `src/agent/mcp-registry.ts`, the way `threads.ts` does. */
+import type { McpResult, McpServerView } from '@agent/types/mcp'
 
-export type McpServerState = 'authenticating' | 'connecting' | 'connected' | 'discovering' | 'ready' | 'failed'
-
-export interface McpServer {
-  id: string
-  name: string
-  url: string
-  state: McpServerState
-  error: string | null
-  authUrl: string | null
-}
+export type McpServer = McpServerView
 
 export interface McpServersResponse {
   servers: McpServer[]
 }
 
-export interface McpAddResponse {
-  ok: true
-  server: McpServer
-}
+export type McpAddResponse = Extract<McpResult<{ server: McpServer }>, { ok: true }>
 
-export interface McpConnectResponse {
-  ok: true
-  authUrl?: string
-}
+export type McpConnectResponse = Extract<McpResult<{ authUrl?: string }>, { ok: true }>
