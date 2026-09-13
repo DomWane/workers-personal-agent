@@ -25,6 +25,9 @@ line-length = 110
 select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF", "PT", "PL", "ANN"]
 ignore = ["PLR2004", "PLR0913"]
 
+[tool.ruff.lint.per-file-ignores]
+"lib/http.py" = ["ANN401"]
+
 [tool.ruff.format]
 quote-style = "single"
 
