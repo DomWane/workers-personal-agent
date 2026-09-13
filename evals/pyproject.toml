@@ -3,7 +3,9 @@ name = "evals"
 version = "0.1.0"
 description = "Offline evaluation of the agent's memory retrieval: retrievers, labels, metrics, judges"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.3",
+]
 
 [dependency-groups]
 dev = [

@@ -2,9 +2,12 @@ import hashlib
 import os
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import NotRequired, Protocol, TypedDict
 
-CORPUS = os.environ.get('EVAL_CORPUS', 'evals/data/corpus.jsonl')
+from lib.paths import DATA
+
+CORPUS = Path(os.environ.get('EVAL_CORPUS', DATA / 'corpus.jsonl'))
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,5 +1,5 @@
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from typing import NamedTuple
 
 
@@ -19,8 +19,8 @@ def reciprocal_rank(ranked: list[str], relevant: list[str]) -> float:
 
 def ndcg_at_k(ranked: list[str], relevant: list[str], k: int) -> float:
     rel = set(relevant)
-    dcg = sum(1 / math.log2(i + 2) for i, item in enumerate(ranked[:k]) if item in rel)
-    ideal = sum(1 / math.log2(i + 2) for i in range(min(k, len(relevant))))
+    dcg = naive_sum(1 / math.log2(i + 2) for i, item in enumerate(ranked[:k]) if item in rel)
+    ideal = naive_sum(1 / math.log2(i + 2) for i in range(min(k, len(relevant))))
     return dcg / ideal if ideal else 0
 
 
@@ -43,6 +43,17 @@ def mulberry32(seed: int) -> Callable[[], float]:
     return rand
 
 
+def naive_sum(xs: Iterable[float]) -> float:
+    total = 0.0
+    for x in xs:
+        total += x
+    return total
+
+
+def mean(xs: Sequence[float]) -> float:
+    return naive_sum(xs) / len(xs) if xs else 0
+
+
 class Bootstrap(NamedTuple):
     mean_diff: float
     lower: float
@@ -56,9 +67,9 @@ def paired_bootstrap(a: list[float], b: list[float], resamples: int = 10_000, se
     diffs = [x - y for x, y in zip(a, b, strict=True)]
     rand = mulberry32(seed)
 
-    means = sorted(sum(diffs[math.floor(rand() * n)] for _ in range(n)) / n for _ in range(resamples))
+    means = sorted(naive_sum(diffs[math.floor(rand() * n)] for _ in range(n)) / n for _ in range(resamples))
     return Bootstrap(
-        mean_diff=sum(diffs) / n,
+        mean_diff=mean(diffs),
         lower=means[math.floor(0.025 * resamples)],
         upper=means[math.floor(0.975 * resamples)],
     )
@@ -67,9 +78,9 @@ def paired_bootstrap(a: list[float], b: list[float], resamples: int = 10_000, se
 def cosine(a: list[float], b: list[float]) -> float:
     if len(a) != len(b):
         raise ValueError(f'cosine: dimension mismatch ({len(a)} vs {len(b)})')
-    dot = sum(x * y for x, y in zip(a, b, strict=True))
-    na = sum(x * x for x in a)
-    nb = sum(y * y for y in b)
+    dot = naive_sum(x * y for x, y in zip(a, b, strict=True))
+    na = naive_sum(x * x for x in a)
+    nb = naive_sum(y * y for y in b)
     if na == 0 or nb == 0:
         return 0
     return dot / (math.sqrt(na) * math.sqrt(nb))
