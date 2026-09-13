@@ -1,7 +1,7 @@
 # Manual walkthrough: threads, compaction, the context meter, the tool archive
 
-What the automated suites cannot see. `pnpm test` runs the Worker without a browser and
-`pnpm test:evals` runs Node; neither loads the built client, and neither opens a WebSocket to a live
+What the automated suites cannot see. `pnpm test` runs the Worker without a browser and the eval
+suite runs Python; neither loads the built client, and neither opens a WebSocket to a live
 Durable Object. Every bug found on 2026-08-17 lived in exactly that gap:
 
 - a `<button>` inside the composer's form defaulted to `type="submit"`, so **Compact** sent an empty

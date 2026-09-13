@@ -2,7 +2,7 @@
 
 A personal agent on Cloudflare Workers, reachable from a web chat. A Durable Object holds one
 conversation and runs a tool loop against an OpenAI-compatible API; long-term memory is markdown in
-R2; `evals/` is a separate Node-side harness for measuring it.
+R2; `evals/` is a separate Python harness for measuring it.
 
 **[ARCHITECTURE.md](ARCHITECTURE.md) is the map**: the platform limits and which of them were
 measured, every ceiling this agent runs into and whether it fails loudly, the invariants that caused
@@ -16,10 +16,8 @@ repository, and how to work here.
 
 ```bash
 pnpm test          # agent tests — Workers pool, excludes evals/
-pnpm test:evals    # eval tests — Node pool
 pnpm check         # tsc --noEmit for src/ and test/
 pnpm check:web     # vue-tsc for web/ — a separate tsconfig, not covered by pnpm check
-pnpm check:evals   # tsc for evals/ — its own tsconfig too, Node types rather than Workers
 pnpm lint          # oxlint, --deny-warnings — reads .vue script blocks too
 pnpm format        # oxfmt in place; format:check is the read-only form
 pnpm build:web     # vite build web → ./public (gitignored; wrangler serves it)
@@ -43,17 +41,18 @@ and is a TTY problem. `script -q /tmp/dev.log pnpm dev` keeps both. For a genuin
 run, an Access **service token** in `CLOUDFLARE_ACCESS_CLIENT_ID` / `CLOUDFLARE_ACCESS_CLIENT_SECRET`
 is the supported path.
 
-`pnpm test` and `pnpm test:evals` are **two different pools and neither runs the other's tests**.
-Running only one and declaring the suite green is a mistake that has happened.
+`pnpm test` and `uv run pytest` (in `evals/`) are **two different suites and neither runs the
+other's tests**. Running only one and declaring the suite green is a mistake that has happened.
 
 **Lint and format decisions live in [docs/decisions/linting-and-formatting.md](docs/decisions/linting-and-formatting.md)**:
 which rules are on, which were counted and refused, and why type-aware linting does *not* need the
 TypeScript 7 upgrade that would break `vue-tsc`. One thing to know without reading it: `pnpm lint`
 runs type-aware rules with no extra flag.
 
-Eval scripts are `eval:*` in `package.json` and run raw TypeScript through Node with no build
-step (`node evals/run-retrieval.ts`). Anything under `evals/` may use `fs`, `process`, and the
-network; anything under `src/` may not.
+`evals/` is a Python project and none of the pnpm commands touch it. From that directory: `uv sync`,
+then `uv run pytest`, `uv run ruff check`, `uv run ruff format`, `uv run pyright`; the scripts are
+listed in [evals/README.md](evals/README.md). Anything under `evals/` may read files, the
+environment and the network; anything under `src/` may not.
 
 ## Tests
 
@@ -108,13 +107,15 @@ it is broken. A guard only guards if the regression actually fails it.
 ## Evals
 
 `evals/lib/` holds pure functions with no I/O so they are unit-testable against literal fixtures;
-runners at `evals/` root do the I/O. Tests are colocated (`foo.ts` next to `foo.test.ts`).
-Write-ups go in `evals/results/*.md`.
+the runners (`run_retrieval.py`, `turn_table.py`, and the `embed/`, `label/`, `gen/`, `models/`,
+`ingest/` modules) do the I/O behind `if __name__ == '__main__'`, so importing one never fires a
+paid call. Tests are colocated (`foo.py` next to `test_foo.py`), pyright runs strict, and every
+function is annotated. Write-ups go in `evals/results/*.md`.
 
 **`evals/data/` is gitignored and the corpus is never committed, shared, or quoted.** It contains
 673 Claude Code exchanges from real work. What is tracked is the half of the harness that *scores* a
 corpus; the step that builds one from local transcripts lives under `internal/`, outside the
-repository, and `Chunk` lives in `evals/lib/corpus.ts` so the tracked half stands alone.
+repository, and `Chunk` lives in `evals/lib/corpus.py` so the tracked half stands alone.
 
 ## Docs
 

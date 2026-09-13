@@ -176,7 +176,7 @@ pnpm dev:web                       # Vite with hot reload, proxied to 8787
 ```bash
 pnpm check && pnpm check:web && pnpm lint && pnpm format:check
 pnpm test                          # agent suite in the Workers pool, no network
-pnpm test:evals                    # retrieval evals, Node pool
+cd evals && uv sync && uv run pytest   # the eval harness is Python; ruff and pyright live there too
 ```
 
 `ENVIRONMENT=localhost` opens two dev-only routes and a seed script that fills a thread without
@@ -207,7 +207,7 @@ src/
   types/                   state and wire shapes, shared with the web client
   connectors/              LLM, Tavily, Firecrawl, Browser Rendering, R2
 web/src/                   Vue 3 client, shadcn-vue and ai-elements-vue components
-evals/                     retrieval and prompt evals, own vitest pool
+evals/                     retrieval and prompt evals, a Python project (uv, pytest, numpy)
 docs/                      decisions, measurements, the manual walkthrough
 ```
 

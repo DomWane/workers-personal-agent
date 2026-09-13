@@ -14,9 +14,43 @@ sessions, so `evals/data/` is git-ignored and the numbers below cannot be reprod
 repository. That is a real limitation of these results and not a formality: read them as a record
 of how the decisions were made, not as a benchmark anyone can re-run.
 
-**The `eval:*` scripts that call out read the same `.env` as `wrangler dev`.** `eval:traces` wants
-`CF_ACCOUNT_ID` and a `CF_API_TOKEN` with Account Analytics: Read; `eval:models:llm-judge` wants
+**The scripts that call out read the same `.env` as `wrangler dev`.** `ingest.traces` wants
+`CF_ACCOUNT_ID` and a `CF_API_TOKEN` with Account Analytics: Read; `models.llm_judge` wants
 `JUDGE_MODEL`, `JUDGE_API_BASE` and `JUDGE_API_KEY`. The rest run offline over `evals/data/`.
+
+## Running it
+
+The harness is a Python project: `uv` manages the interpreter and the dependencies, `pytest` runs
+the tests, `ruff` and `pyright` keep it honest. Everything runs from this directory.
+
+```bash
+cd evals
+uv sync                                   # Python 3.14 and the dependencies, into .venv
+uv run pytest                             # the unit tests, no data needed
+uv run ruff check && uv run pyright       # what CI runs
+
+uv run python run_retrieval.py            # score every retriever, write results/latest-retrieval.json
+uv run python turn_table.py               # traces.jsonl → results/turns.csv, the publishable projection
+uv run python -m ingest.traces            # export the last 3 days of Workers Logs into data/
+uv run python -m gen.queries              # generate candidate queries (OpenRouter)
+uv run python -m label.prescreen          # flag candidates a human would probably drop
+uv run python -m label.retrieval          # keep / drop / edit the bulk set, interactively
+uv run python -m label.hard               # write the hard set from memory, then locate the target
+uv run python -m label.pool hard 3        # judge the union of every retriever's top-3
+uv run python -m embed.precompute         # bge-m3 vectors for the corpus and the queries (Workers AI)
+uv run python -m embed.rerank_precompute  # cross-encoder order per query (Workers AI)
+uv run python -m embed.fasttext_extract   # corpus vocabulary out of cc.cs.300.vec.gz
+uv run python -m models.compare           # ThinkingCap: both models over the same context
+uv run python -m models.judge             # blind pairwise preference, interactively
+uv run python -m models.llm_judge         # the same pairs through an LLM judge
+uv run python -m models.judge_agreement   # Cohen's κ between the two
+uv run python -m models.analyze           # the pre-registered analysis
+```
+
+The harness was ported from TypeScript in September 2026. The retrieval runner reproduces the
+TypeScript numbers bit for bit, including every bootstrap interval, because the PRNG (`mulberry32`)
+and the naive float summation were carried over unchanged. `results/` was written by the TypeScript
+harness and stays valid.
 
 **A negative result is a result.** Past the baseline there are five experiments below. One was
 adopted on a clear win, **three were rejected outright**, and one came back null and was adopted on

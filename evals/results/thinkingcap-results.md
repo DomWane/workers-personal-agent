@@ -7,7 +7,7 @@
 
 Design fixed in advance in [thinkingcap-preregistration.md](thinkingcap-preregistration.md) with
 five dated amendments. Every metric and cut below is named there; nothing was chosen after seeing
-the numbers. Reproduce with `pnpm eval:models:analyze`.
+the numbers. Reproduce with `uv run python -m models.analyze`.
 
 **n = 30** questions from the hard set, both models given byte-identical input: the same
 `bge-m3` top-5 context, temperature 0, `max_tokens` 16 000.

@@ -3,7 +3,7 @@
 A personal agent on Cloudflare Workers, reachable from a web chat. A Durable Object
 (`PersonalAgent`) holds one conversation and runs a tool loop against an OpenAI-compatible API.
 Long-term memory is markdown in an R2 bucket; semantic recall is an embedding index in DO SQLite.
-`evals/` is a separate Node-side harness for measuring the agent, not part of the deployed Worker.
+`evals/` is a separate Python harness for measuring the agent, not part of the deployed Worker.
 
 ```
   ┌─ the browser ────────────────────────────────────────────────────────────┐
