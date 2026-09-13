@@ -1,0 +1,40 @@
+[project]
+name = "evals"
+version = "0.1.0"
+description = "Offline evaluation of the agent's memory retrieval: retrievers, labels, metrics, judges"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pyright>=1.1",
+  "pytest>=8.3",
+  "ruff>=0.12",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py314"
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF", "PT", "PL", "ANN"]
+ignore = ["PLR2004", "PLR0913"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.pyright]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+exclude = [".venv", "data"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["."]
+python_files = ["test_*.py"]
+addopts = "-q"

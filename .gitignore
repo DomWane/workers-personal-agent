@@ -13,6 +13,10 @@ public/
 
 # Harness output: the corpus, labels, vectors and judgments. Never published.
 evals/data/
+evals/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
 
 # Working material — plans, notes, and the local-only half of the evals.
 internal/
