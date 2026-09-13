@@ -18,12 +18,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm check:web
-      - run: pnpm check:evals
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm build:web
       - run: pnpm test
-      - run: pnpm test:evals
 
   evals:
     runs-on: ubuntu-latest

@@ -7,9 +7,8 @@ export default defineWorkersConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   test: {
-    // evals/ has its own vitest.evals.config.ts: eval code uses fs/process, which the
-    // Workers pool does not provide, so those tests must never run in this pool.
-    // internal/ is gitignored local material with the same shape; a clean clone has none.
+    // evals/ is a Python project with its own pytest suite; nothing under it is a vitest test.
+    // internal/ is gitignored local material; a clean clone has none.
     exclude: [...defaultExclude, 'evals/**', 'internal/**'],
     poolOptions: {
       workers: {
