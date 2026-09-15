@@ -1,0 +1,8 @@
+allowBuilds:
+  '@mongodb-js/zstd': false
+  core-js-pure: false
+  esbuild: false
+  node-liblzma: false
+  sharp: false
+  vue-demi: false
+  workerd: false
