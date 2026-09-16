@@ -30,7 +30,7 @@
     "@cloudflare/workers-types": "^4.20260702.1",
     "@lucide/vue": "^1.46.0",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.0",
     "@vitejs/plugin-vue": "^6.0.9",
     "@vueuse/core": "^14.4.0",
     "class-variance-authority": "^0.7.1",
@@ -52,6 +52,6 @@
     "vue-stick-to-bottom": "^1.0.1",
     "vue-stream-markdown": "^1.0.4",
     "vue-tsc": "^3.3.11",
-    "wrangler": "^4.131.2"
+    "wrangler": "^4.132.0"
   }
 }
