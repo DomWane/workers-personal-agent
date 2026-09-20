@@ -8,8 +8,8 @@ export default defineWorkersConfig({
   },
   test: {
     // evals/ is a Python project with its own pytest suite; nothing under it is a vitest test.
-    // internal/ is gitignored local material; a clean clone has none.
-    exclude: [...defaultExclude, 'evals/**', 'internal/**'],
+    // internal/ and .kilo/ are gitignored local material; a clean clone has neither.
+    exclude: [...defaultExclude, 'evals/**', 'internal/**', '.kilo/**'],
     poolOptions: {
       workers: {
         singleWorker: true,
