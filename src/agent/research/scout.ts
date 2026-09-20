@@ -11,7 +11,7 @@ import { contentEnabled, createLog, errorFields, type TurnLog } from '@/agent/lo
 import { buildScoutPrompt } from '@/agent/research/round'
 import { emptyOutcome, runResearchRound, type ScoutOutcome } from '@/agent/research/runner'
 import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from '@/agent/subrequest-budget'
-import { cachedSubrequestLimit } from '@/agent/workers-plan'
+import { applySubrequestLimit } from '@/agent/workers-plan'
 
 export interface ScoutInput {
   topic: string
@@ -48,9 +48,7 @@ export class ResearchScout extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
-    void ctx.blockConcurrencyWhile(async () => {
-      this.planLimit = await cachedSubrequestLimit(ctx.storage, env, createLog('research'))
-    })
+    void applySubrequestLimit(ctx.storage, env, (limit) => (this.planLimit = limit), createLog('research'))
   }
 
   private budget(): SubrequestBudget {

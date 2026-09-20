@@ -14,7 +14,7 @@ import { sqlTag } from '@/agent/archive'
 import { EmbeddingIndex, type MemoryIndex, type ReindexReport, reindexInto } from '@/agent/memory/embedding-index'
 import { createMemoryStore } from '@/agent/memory/vault-store'
 import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from '@/agent/subrequest-budget'
-import { cachedSubrequestLimit } from '@/agent/workers-plan'
+import { applySubrequestLimit } from '@/agent/workers-plan'
 
 export const INDEX_INSTANCE = 'index'
 export const REFLECTION_INSTANCE = 'reflection'
@@ -36,9 +36,7 @@ export class MaintenanceAgent extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
-    void ctx.blockConcurrencyWhile(async () => {
-      this.planLimit = await cachedSubrequestLimit(ctx.storage, env, createLog('reflection'))
-    })
+    void applySubrequestLimit(ctx.storage, env, (limit) => (this.planLimit = limit), createLog('reflection'))
   }
 
   private budget(): SubrequestBudget {

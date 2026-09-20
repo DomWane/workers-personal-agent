@@ -23,7 +23,7 @@ import { verdictFor, type CitationVerdict } from '@/agent/provenance'
 import { buildSystemPrompt, renderSkillIndex } from '@/agent/system-prompt'
 import { contentEnabled, createLog, errorFields, ORPHAN_LOG, type LogSource, type TurnLog } from '@/agent/log'
 import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from '@/agent/subrequest-budget'
-import { cachedSubrequestLimit } from '@/agent/workers-plan'
+import { applySubrequestLimit } from '@/agent/workers-plan'
 import * as research from '@/agent/research/commands'
 import { runToolLoop, turnToolTraffic, type StopReason } from '@/agent/loop/tool-loop'
 import { buildTools } from '@/agent/tools'
@@ -196,7 +196,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
   }
 
   async onStart(): Promise<void> {
-    this.planLimit = await cachedSubrequestLimit(this.ctx.storage, this.env, this.newLog('schedule'))
+    void applySubrequestLimit(this.ctx.storage, this.env, (limit) => (this.planLimit = limit), this.newLog('schedule'))
     if (!this.state.status) {
       return
     }

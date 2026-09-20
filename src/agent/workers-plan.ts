@@ -33,17 +33,27 @@ export async function fetchSubrequestLimit(env: Env, log?: TurnLog): Promise<num
   }
 }
 
-export async function cachedSubrequestLimit(storage: DurableObjectStorage, env: Env, log?: TurnLog): Promise<number> {
-  const cached = await storage.get<CachedPlan>(PLAN_KEY)
-  if (cached && Date.now() - cached.at < PLAN_TTL_MS) {
-    return cached.limit
+export async function applySubrequestLimit(
+  storage: DurableObjectStorage,
+  env: Env,
+  apply: (limit: number) => void,
+  log?: TurnLog,
+): Promise<void> {
+  try {
+    const cached = await storage.get<CachedPlan>(PLAN_KEY)
+    if (cached && Date.now() - cached.at < PLAN_TTL_MS) {
+      apply(cached.limit)
+      return
+    }
+    const limit = await fetchSubrequestLimit(env, log)
+    if (limit === null) {
+      return
+    }
+    apply(limit)
+    await storage.put<CachedPlan>(PLAN_KEY, { limit, at: Date.now() })
+  } catch (err) {
+    log?.error({ at: 'workers-plan', stage: 'storage-failed', error: errorFields(err) })
   }
-  const limit = await fetchSubrequestLimit(env, log)
-  if (limit === null) {
-    return FREE_PLAN_SUBREQUESTS
-  }
-  await storage.put<CachedPlan>(PLAN_KEY, { limit, at: Date.now() })
-  return limit
 }
 
 export async function forgetSubrequestLimit(storage: DurableObjectStorage): Promise<void> {
