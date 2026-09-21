@@ -51,6 +51,7 @@ const { threads, current, closed, open, create, refresh } = useThreads()
 const {
   state,
   connected,
+  loaded,
   say,
   setModel,
   research: run,
@@ -274,8 +275,13 @@ const showReport = computed(() => research.value?.phase === 'done' && !!research
                 </CollapsibleContent>
               </Collapsible>
 
+              <div v-if="!loaded" class="flex items-center gap-2 text-muted-foreground text-sm">
+                <Loader :size="16" />
+                Loading…
+              </div>
+
               <ConversationEmptyState
-                v-if="!thread.length"
+                v-else-if="!thread.length"
                 title="Nothing here yet"
                 description="Ask anything. Switch the composer to Deep research for a multi-round run."
               />

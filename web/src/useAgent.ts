@@ -18,6 +18,7 @@ const HANDSHAKE_MS = 5_000
 export function useAgent(thread: Ref<string>, closed: Ref<string | null>) {
   const state = ref<AgentState>({ messages: [] })
   const connected = ref(false)
+  const loaded = ref(false)
   let socket: AgentClient<unknown, AgentState>
   /** Every RPC waits on this. Without it the first message after a connect — a page load, or a
    *  thread switch — races the handshake and is sent on a socket that is not open yet. */
@@ -31,6 +32,7 @@ export function useAgent(thread: Ref<string>, closed: Ref<string | null>) {
       onStateUpdate: (next) => {
         if (next) {
           state.value = next
+          loaded.value = true
         }
       },
     })
@@ -57,6 +59,7 @@ export function useAgent(thread: Ref<string>, closed: Ref<string | null>) {
     () => {
       socket.close()
       connected.value = false
+      loaded.value = false
       state.value = { messages: [] }
       if (!closed.value) {
         connect()
@@ -139,5 +142,5 @@ export function useAgent(thread: Ref<string>, closed: Ref<string | null>) {
   const rateMessage = (id: string, rating: 'up' | 'down' | 'none', note?: string) =>
     rpc('rateMessage', [id, rating, note], 'The rating was not recorded')
 
-  return { state, connected, say, setModel, research, deleteThread, renameThread, compactNow, rateMessage }
+  return { state, connected, loaded, say, setModel, research, deleteThread, renameThread, compactNow, rateMessage }
 }
