@@ -74,6 +74,16 @@ Two queued messages made `messages.at(-1)` rewrite turn 2's text with turn 1's a
 question as an assistant line. The id rides in the payload, each turn rebuilds the outgoing history
 as it happened, and the status clears only when no `processWebMessage` schedule is left.
 
+## The running turn is broadcast as `state.live`
+
+The loop hands each step and each result to the agent as it happens and the agent broadcasts them
+in `live`; the `setState` that writes the finished turn into `messages` clears it. The client draws
+`messages` and `live` through one grouping (`groupTurns`), so a turn looks the same while it runs
+and after it lands: every text the model wrote, in order, with each tool call as a collapsed card
+beside its result. **Rejected:** showing only the final round's text. Seen 2026-09-22: a model
+wrote its answer beside a `save_memory` call, then said "Saved."; the answer was persisted with the
+call and hidden with it.
+
 ## RPC failures surface as toasts
 
 Raised in `useAgent`'s `rpc`, which returns `false` rather than throwing: every caller is a click,

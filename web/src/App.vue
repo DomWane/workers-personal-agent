@@ -16,7 +16,8 @@ import {
 } from '@/components/ai-elements/prompt-input'
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input'
 import { Loader } from '@/components/ai-elements/loader'
-import { Tool, ToolContent, ToolHeader, ToolOutput } from '@/components/ai-elements/tool'
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '@/components/ai-elements/tool'
+import type { ToolState } from '@/components/ai-elements/ai-types'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Button } from '@/components/ui/button'
 import {
@@ -41,8 +42,9 @@ import Toaster from '@/components/Toaster.vue'
 import ResearchProposal from '@/components/ResearchProposal.vue'
 import ResearchRunning from '@/components/ResearchRunning.vue'
 import ResearchReport from '@/components/ResearchReport.vue'
-import { contextUsage, formatTokens, spoken, wouldCompact } from '@/lib/context'
-import { toolSummary } from '@/lib/tools'
+import { contextUsage, formatTokens, wouldCompact } from '@/lib/context'
+import { groupTurns, type ToolStep } from '@agent/agent/loop/turns'
+import type { ToolCall } from '@agent/types/chat'
 import { useAgent } from '@/useAgent'
 import { LANDING, useThreads } from '@/useThreads'
 import type { ChatMode, ModelRow } from '@/types'
@@ -179,7 +181,22 @@ function rememberSplit(sizes: number[]) {
   }
 }
 
-const thread = computed(() => spoken(state.value.messages))
+const turns = computed(() => groupTurns([...state.value.messages, ...(state.value.live ?? [])]))
+
+function stepState(step: ToolStep): ToolState {
+  if (!step.result) {
+    return 'input-available'
+  }
+  return step.result.content.startsWith('error:') ? 'output-error' : 'output-available'
+}
+
+function parsedArgs(call: ToolCall): unknown {
+  try {
+    return JSON.parse(call.function.arguments || '{}')
+  } catch {
+    return call.function.arguments
+  }
+}
 
 const research = computed(() => state.value.research)
 /** A turn being answered, a plan being written, or a run working through its rounds — all of it is
@@ -281,38 +298,40 @@ const showReport = computed(() => research.value?.phase === 'done' && !!research
               </div>
 
               <ConversationEmptyState
-                v-else-if="!thread.length"
+                v-else-if="!turns.length"
                 title="Nothing here yet"
                 description="Ask anything. Switch the composer to Deep research for a multi-round run."
               />
 
-              <Message v-for="(m, i) in thread" :key="m.id ?? i" :from="m.role" class="group">
+              <Message v-for="t in turns" :key="t.id" :from="t.from" class="group">
                 <MessageContent>
-                  <MessageResponse :content="m.content" />
-                  <Tool v-if="m.role === 'assistant' && m.tools?.length">
-                    <ToolHeader
-                      type="dynamic-tool"
-                      :tool-name="'tools'"
-                      state="output-available"
-                      :title="`used ${toolSummary(m.tools)}`"
-                    />
-                    <ToolContent>
-                      <ToolOutput :output="m.tools.join('\n')" :error-text="undefined" />
-                    </ToolContent>
-                  </Tool>
+                  <template v-for="(s, i) in t.segments" :key="i">
+                    <MessageResponse v-if="s.kind === 'text'" :content="s.message.content" />
+                    <Tool v-else>
+                      <ToolHeader type="dynamic-tool" :tool-name="s.call.function.name" :state="stepState(s)" />
+                      <ToolContent>
+                        <ToolInput :input="parsedArgs(s.call)" />
+                        <ToolOutput v-if="s.result" :output="s.result.content" :error-text="undefined" />
+                      </ToolContent>
+                    </Tool>
+                  </template>
                   <!-- What the answer cost, where the answer is — the meter above it prices the
                      next request instead, and the two are different questions. Absent rather than
                      zero when the provider reported no usage: see `stage: 'unmetered'`. -->
                   <span
-                    v-if="m.role === 'assistant' && m.tokens"
+                    v-if="t.final?.tokens"
                     class="text-muted-foreground text-xs tabular-nums"
-                    :title="`${m.tokens.toLocaleString()} tokens in and out, counted by the provider`"
+                    :title="`${t.final.tokens.toLocaleString()} tokens in and out, counted by the provider`"
                   >
-                    {{ formatTokens(m.tokens) }} tokens
+                    {{ formatTokens(t.final.tokens) }} tokens
                   </span>
                   <!-- Only on answers that can be pointed at: a rating is evidence for the nightly
                      pass, and one that names no message is not evidence at all. -->
-                  <MessageFeedback v-if="m.role === 'assistant' && m.id" :message-id="m.id" :rate="rateMessage" />
+                  <MessageFeedback
+                    v-if="t.from === 'assistant' && t.final"
+                    :message-id="t.final.id"
+                    :rate="rateMessage"
+                  />
                 </MessageContent>
               </Message>
 

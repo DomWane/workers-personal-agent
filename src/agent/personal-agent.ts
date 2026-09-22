@@ -25,7 +25,7 @@ import { contentEnabled, createLog, errorFields, ORPHAN_LOG, type LogSource, typ
 import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from '@/agent/subrequest-budget'
 import { applySubrequestLimit } from '@/agent/workers-plan'
 import * as research from '@/agent/research/commands'
-import { runToolLoop, turnToolTraffic, type StopReason } from '@/agent/loop/tool-loop'
+import { runToolLoop, toHistoryMessage, turnToolTraffic, type StopReason } from '@/agent/loop/tool-loop'
 import { buildTools } from '@/agent/tools'
 import type { ToolContext, ToolDef } from '@/agent/tools/registry'
 import type {
@@ -169,6 +169,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       await this.clearStatusIfIdle(payload.id)
       log.event({ at: 'turn', ...turnFields(outcome), subrequests: budget.spent })
     } catch (err) {
+      this.setState({ ...this.state, live: undefined })
       await this.clearStatusIfIdle(payload.id)
       log.error({
         at: 'turn',
@@ -206,7 +207,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       return
     }
     this.newLog('schedule').event({ at: 'turn', stage: 'status-orphaned', status: this.state.status })
-    this.setState({ ...this.state, status: undefined })
+    this.setState({ ...this.state, status: undefined, live: undefined })
   }
 
   @callable()
@@ -376,6 +377,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
     const startedAt = Date.now()
     const client = this.llm(budget)
     const { tools, mcpTools } = await this.turnTools(log)
+    let live: HistoryMessage[] = []
     const {
       text: reply,
       toolsUsed,
@@ -398,6 +400,10 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       ctx: this.toolContext(budget, log, opts.userMessageId ? persistedUser : ownTurn),
       subrequests: budget,
       log,
+      onMessage: (m) => {
+        live = [...live, toHistoryMessage(m, Date.now())]
+        this.setState({ ...this.state, live })
+      },
     })
 
     const combined: HistoryMessage[] = [
@@ -417,6 +423,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
     this.setState({
       ...this.state,
       messages: combined,
+      live: undefined,
       promptTokens,
       ...(toolsUsed.includes('update_user_profile') ? { userProfile: undefined } : {}),
       ...(toolsUsed.includes('update_agent_notes') ? { agentNotes: undefined } : {}),

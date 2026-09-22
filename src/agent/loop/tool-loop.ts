@@ -81,7 +81,10 @@ export interface ToolLoopInput {
   perToolTimeoutMs?: number
   subrequests?: SubrequestBudget
   forceFinalAnswer?: boolean
+  onMessage?: (message: LoopMessage) => void
 }
+
+type LoopMessage = Extract<ChatMessage, { role: 'assistant' | 'tool' }>
 
 export interface LoopResult {
   text: string
@@ -139,7 +142,7 @@ export function turnToolTraffic(
   now: number,
   log?: TurnLog,
 ): HistoryMessage[] {
-  const written = toHistory(messages.slice(1 + priorHistory), now)
+  const written = messages.slice(1 + priorHistory).map((m) => toHistoryMessage(m, now))
   const paired = pairedOnly(written)
   if (paired.length !== written.length) {
     log?.error({ at: 'tool-loop', stage: 'unpaired-write', dropped: written.length - paired.length, priorHistory })
@@ -147,24 +150,22 @@ export function turnToolTraffic(
   return paired
 }
 
-function toHistory(messages: ChatMessage[], now: number): HistoryMessage[] {
-  return messages.map((m) => {
-    const base = { id: crypto.randomUUID(), at: now }
-    if (m.role === 'tool') {
-      return {
-        ...base,
-        role: 'tool' as const,
-        content: truncate(shorten(m.content), PRUNE_OVER_CHARS),
-        tool_call_id: m.tool_call_id,
-      }
-    }
+export function toHistoryMessage(m: ChatMessage, now: number): HistoryMessage {
+  const base = { id: crypto.randomUUID(), at: now }
+  if (m.role === 'tool') {
     return {
       ...base,
-      role: 'assistant' as const,
-      content: m.content ?? '',
-      ...('tool_calls' in m && m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+      role: 'tool',
+      content: truncate(shorten(m.content), PRUNE_OVER_CHARS),
+      tool_call_id: m.tool_call_id,
     }
-  })
+  }
+  return {
+    ...base,
+    role: 'assistant',
+    content: m.content ?? '',
+    ...('tool_calls' in m && m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+  }
 }
 
 async function fileAndTrim(
@@ -267,7 +268,9 @@ export async function runToolLoop(input: ToolLoopInput): Promise<LoopResult> {
       }
 
       pruneToolResults(messages, messages.length, round, log)
-      messages.push({ role: 'assistant', content: content || null, tool_calls: toolCalls })
+      const step: LoopMessage = { role: 'assistant', content: content || null, tool_calls: toolCalls }
+      messages.push(step)
+      input.onMessage?.(step)
       const executed = await Promise.all(
         toolCalls.map(async (call) => ({
           call,
@@ -292,7 +295,9 @@ export async function runToolLoop(input: ToolLoopInput): Promise<LoopResult> {
           },
           { args: call.function.arguments.slice(0, 200), resultHead: result.slice(0, 160) },
         )
-        messages.push({ role: 'tool', tool_call_id: call.id, content: result })
+        const answered: LoopMessage = { role: 'tool', tool_call_id: call.id, content: result }
+        messages.push(answered)
+        input.onMessage?.(answered)
 
         if (!outOfBudget) {
           const key = `${call.function.name}\0${call.function.arguments}\0${result}`

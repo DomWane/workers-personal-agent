@@ -46,7 +46,9 @@ Cloudflare Access became the gate: Access binds to the Worker and authenticates 
 webhook cannot sign in. The client is a Vue app in `web/`, built into `./public` and served by the
 Worker's asset binding; it talks to the DO over the Agents SDK WebSocket. Its whole delivery
 mechanism is `setState`: the SDK persists *and* broadcasts to every connected client, so the thread,
-the research status card and the finished report need no sending code at all.
+the research status card and the finished report need no sending code at all. A running turn rides
+the same way: `state.live` holds the steps and results the loop has produced so far, and the
+`setState` that writes the finished turn into `messages` clears it.
 
 Runtime deps of the Worker are `agents`, `openai` and `zod`. The bundle cap that used to be the
 argument against a third one was misread: **the 3 MB Free-plan limit is on the gzipped upload**, not

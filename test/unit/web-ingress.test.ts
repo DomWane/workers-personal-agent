@@ -29,11 +29,12 @@ async function takeSchedules(agent: PersonalAgent, callback: string) {
 const disarmAlarm = (agent: PersonalAgent) =>
   (agent as unknown as { ctx: DurableObjectState }).ctx.storage.deleteAlarm()
 
-function replyOnce(content: string, capture?: (body: string) => void) {
+function replyOnce(reply: string | Record<string, unknown>, capture?: (body: string) => void) {
+  const message = typeof reply === 'string' ? { content: reply } : reply
   fetchMock
     .get('https://llm.example')
     .intercept({ method: 'POST', path: '/v1/chat/completions' })
-    .reply(200, ({ body }) => (capture?.(body as string), { choices: [{ message: { content } }] }), {
+    .reply(200, ({ body }) => (capture?.(body as string), { choices: [{ message }] }), {
       headers: { 'content-type': 'application/json' },
     })
 }
@@ -238,6 +239,36 @@ describe('setModel', () => {
       expect(agent.state.messages.map((m) => m.content)).toEqual(['/what-is-the-weather'])
       expect(agent.state.status).toBe('thinking')
       expect(await takeSchedules(agent, 'processWebMessage')).toHaveLength(1)
+    })
+  })
+})
+
+describe('the running turn', () => {
+  it('shows each step live, then folds them into the thread when the answer lands', async () => {
+    const stub = await freshAgent()
+    await runInDurableObject(stub, async (agent: PersonalAgent) => {
+      const liveAtEachCall: number[] = []
+      const noteLive = () => liveAtEachCall.push(agent.state.live?.length ?? 0)
+      replyOnce(
+        {
+          content: 'Checking the calendar',
+          tool_calls: [{ id: 'c1', type: 'function', function: { name: 'list_scheduled', arguments: '{}' } }],
+        },
+        noteLive,
+      )
+      replyOnce('Nothing is scheduled.', noteLive)
+
+      await agent.enqueueWebMessage('anything due?')
+      const [scheduled] = await takeSchedules(agent, 'processWebMessage')
+      await agent.processWebMessage(scheduled.payload as WebMessagePayload)
+
+      expect(liveAtEachCall).toEqual([0, 2])
+      expect(agent.state.live).toBeUndefined()
+      expect(agent.state.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'tool', 'assistant'])
+      expect(agent.state.messages[1]).toMatchObject({
+        content: 'Checking the calendar',
+        tool_calls: [expect.objectContaining({ id: 'c1' })],
+      })
     })
   })
 })

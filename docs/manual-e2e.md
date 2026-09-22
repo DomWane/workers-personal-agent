@@ -557,7 +557,8 @@ Walked with a bearer-token example server on 2026-09-07:
   server that wants one — the bearer token. The row appears, flips through *Connecting* and settles
   on **Ready**; a key-authenticated server never opens a popup
 - leave the dialog and send a message that asks for the server's tool (the example's `echo`):
-  the model answers using it, and under the answer the thread shows the tool used
+  the model answers using it; the call shows inside the answer as a collapsed card with its
+  result, and it is there while the turn is still running, before the answer lands
 - the server's own Durable Object is the one that talked to it, so the *chat* turn's `subrequests` count does not
   climb with MCP calls; the log's `mcpTools` field is the number of server tools the turn held
 - edit the server (the pencil on its row): the form fills with its name and URL and the bearer

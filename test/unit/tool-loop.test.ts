@@ -86,6 +86,22 @@ describe('runToolLoop', () => {
     expect(msgs.at(-2)).toMatchObject({ role: 'assistant' })
   })
 
+  it('hands each step and each result to onMessage as it happens, and never the final answer', async () => {
+    queueResponse({
+      content: 'Looking that up',
+      tool_calls: [{ id: 'c1', type: 'function', function: { name: 'echo', arguments: '{"text":"hi"}' } }],
+    })
+    queueResponse({ content: 'done' })
+    const seen: unknown[] = []
+
+    await loop([echoTool], { onMessage: (m) => seen.push(structuredClone(m)) })
+
+    expect(seen).toEqual([
+      { role: 'assistant', content: 'Looking that up', tool_calls: [expect.objectContaining({ id: 'c1' })] },
+      { role: 'tool', tool_call_id: 'c1', content: 'echo:hi' },
+    ])
+  })
+
   it('feeds error strings back for unknown tools and bad arguments', async () => {
     let second: Record<string, unknown> | undefined
     queueResponse({
