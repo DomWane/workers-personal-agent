@@ -1,4 +1,4 @@
-import { onScopeDispose, ref } from 'vue'
+import { onScopeDispose, ref, watch, type Ref } from 'vue'
 import type { McpAddResponse, McpConnectResponse, McpServer, McpServersResponse } from './types/mcp'
 
 function errorOf(res: Response, body: unknown): string {
@@ -10,10 +10,10 @@ const POPUP = 'popup=yes,width=640,height=720'
 
 /**
  * The MCP server list behind the settings dialog, and the calls that mutate it. The dialog polls
- * while any server is mid-sign-in: the OAuth callback closes its popup in the browser, and this
- * poll is what notices the registry went READY on the server side.
+ * while it is open and any server is mid-sign-in: the OAuth callback closes its popup in the
+ * browser, and this poll is what notices the registry went READY on the server side.
  */
-export function useMcpServers() {
+export function useMcpServers(open: Ref<boolean>) {
   const servers = ref<McpServer[]>([])
   const busy = ref(false)
   const error = ref<string | null>(null)
@@ -27,7 +27,7 @@ export function useMcpServers() {
   }
 
   function pollWhileAuthenticating(): void {
-    if (servers.value.some((s) => s.state === 'authenticating')) {
+    if (open.value && servers.value.some((s) => s.state === 'authenticating')) {
       timer ??= setInterval(() => {
         void refresh()
       }, 2000)
@@ -51,7 +51,13 @@ export function useMcpServers() {
       // Keep the last list: the next refresh retries, and the dialog already has something to show.
     }
   }
-  void refresh()
+  watch(open, (isOpen) => {
+    if (isOpen) {
+      void refresh()
+    } else {
+      stopPolling()
+    }
+  })
 
   /** One mutating call: the Worker's `{ error }` lands in `error`, anything else comes back parsed.
    *  The refresh is not awaited, so a sign-in popup opened right after this still counts as the

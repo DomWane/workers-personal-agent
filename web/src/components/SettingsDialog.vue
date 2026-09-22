@@ -15,8 +15,8 @@ import {
 import { useMcpServers } from '@/useMcpServers'
 import type { McpServer } from '@/types/mcp'
 
-const { servers, busy, error, refresh, add, connect, remove } = useMcpServers()
 const open = ref(false)
+const { servers, busy, error, refresh, add, connect, remove } = useMcpServers(open)
 
 const name = ref('')
 const url = ref('')
@@ -60,7 +60,7 @@ const sorted = computed(() => [...servers.value].sort((a, b) => a.name.localeCom
 </script>
 
 <template>
-  <Dialog v-model:open="open" @update:open="refresh">
+  <Dialog v-model:open="open">
     <DialogTrigger as-child>
       <Button variant="ghost" class="size-7 p-0" :aria-label="'Settings'">
         <SettingsIcon class="size-4" />
