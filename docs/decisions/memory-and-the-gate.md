@@ -10,8 +10,8 @@ design, and the gap is recorded here.
 the thread that holds it. Appending is free, and so is `save_memory` under an existing name:
 gating updates would refuse most of what the assistant learns. The previous text of an overwritten
 memory is lost, the one hole in "compaction is the only thing that destroys history". The profile
-was nearly missed and matters most: it is the write the nightly prompt steers toward first, and a
-line deleted there leaves the only memory the model always sees.
+matters most: it is the write the nightly prompt steers toward first, and a line deleted there
+leaves the only memory the model always sees.
 
 ## In a chat the gate satisfies itself
 

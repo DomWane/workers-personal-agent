@@ -45,9 +45,9 @@ ordinary round over the pre-wave state (`spent: 70`, `rounds: 1`).
 
 ## `SCOUT_TIMEOUT_MS` is 180 s
 
-Local scouts took 45 to 90 s and the first value was 120 s. In production two of four finished at
-about 138 s and 162 s after the wave had closed, their pages paid for and thrown away. The cap must
-clear the slowest scout still working; a test ties the constant to the measurement.
+Local scouts take 45 to 90 s; in production two of four finished at about 138 s and 162 s, past a
+120 s cap, their pages paid for and thrown away. The cap must clear the slowest scout still working;
+a test ties the constant to the measurement.
 
 ## A round with no source has its findings dropped
 
@@ -94,7 +94,7 @@ arXiv 2601.22984), and stripping would lose real ones to a formatting slip.
 
 ## Findings are appended per round; the report is written once
 
-The first design rewrote one `notes` document every round, putting early findings through twelve
+**Rejected.** One `notes` document rewritten every round: early findings go through twelve
 compressions. `FINDINGS_SHOWN = 3` bounds what a round is shown, not what the report reads.
 
 ## The request budget derives from the round cap
@@ -108,9 +108,8 @@ Set independently, 250 against a cap of 20 once funded 7 rounds under a floor of
 **Decision.** `quick` 120 s and 4 scouts, `normal` 300 s and 5, `deep` 600 s and 5. The preset rides
 on the run, so a run cannot change shape halfway. Five minutes is a judgement about a watched status
 card, not a cited figure.
-**`quick`.** Started at three scouts, which dropped the fourth plan angle silently; raised to four
-once the search cache halved what a scout asks of Browser Rendering. In practice one wave and the
-report.
+**`quick`.** Four scouts, not three: three drop the fourth plan angle silently, and the search cache
+halves what a scout asks of Browser Rendering. In practice one wave and the report.
 **The first round is never refused for time.** Before any round the reservation is the 210 s worst
 case, more than `quick`'s deadline, and the first `quick` run ended "done" with nothing.
 **The clock bounds the reading, not the report.** Writing took 91 s, 239 s and 172 s on the first
@@ -151,7 +150,7 @@ The loop's `stopReason` (`complete`, `max-rounds`, `time-budget`, `subrequest-bu
 
 ## The composer toggle is the only way to start a run
 
-A `deep_research` tool was tried and removed: it stayed silent on "Research companies using
-Cloudflare" against a description opening with REQUIRED, and the same latitude proposed runs nobody
-wanted. The cost is discoverability. Where the finished report lives and how a turn reads it:
+**Rejected.** A `deep_research` tool: it stayed silent on "Research companies using Cloudflare"
+against a description opening with REQUIRED, and the same latitude proposed runs nobody wanted. The
+cost is discoverability. Where the finished report lives and how a turn reads it:
 [web-and-channels.md](web-and-channels.md).

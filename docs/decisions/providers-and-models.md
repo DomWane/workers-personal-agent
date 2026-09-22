@@ -15,6 +15,6 @@ on the Workers Free plan".
 `CF_API_TOKEN` needs Workers AI: Read (catalogue, and chat on the default provider), Browser
 Rendering: Edit (`read_page`) and Billing: Read (the hourly plan lookup, per the API reference for
 `GET /accounts/{id}/subscriptions`, checked 2026-09-05). `evals/ingest/traces.ts` adds Account
-Analytics: Read. It replaced two scoped tokens: measured 2026-08-12, the AI token returned 401 on
-browser rendering and the browser token 403 on the catalogue, and one token carrying both answers
-200 to both.
+Analytics: Read.
+**Rejected.** Two scoped tokens: measured 2026-08-12, the AI token returned 401 on browser
+rendering and the browser token 403 on the catalogue; one token carrying both answers 200 to both.

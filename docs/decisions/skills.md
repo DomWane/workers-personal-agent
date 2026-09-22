@@ -8,9 +8,9 @@ curates them.
 ## The index rides in the system prompt, the body stays behind read_skill
 
 Every system prompt carries one `- slug — description` line per skill inside `<skills>`. The body is
-loaded only by `read_skill` or by `/<slug>` in the message. Until 2026-09-07 the model saw nothing
-and was told to call `list_skills` before a workflow-shaped task, which it could not know it had:
-the choice was a blind tool call every turn or never using a skill.
+loaded only by `read_skill` or by `/<slug>` in the message.
+**Rejected.** No index, and an instruction to call `list_skills` before a workflow-shaped task the
+model could not know it had: a blind tool call every turn or never using a skill.
 
 The index is read from the vault on every turn, not frozen per session like `USER.md` and
 `AGENT.md`. A snapshot would go stale in a way nothing in the thread can notice: the nightly

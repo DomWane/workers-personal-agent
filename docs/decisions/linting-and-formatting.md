@@ -58,5 +58,5 @@ and `Object.groupBy`.
 `curly: ["error", "all"]` is the one rule here for a stated preference: a branch and its body do
 not share a line. oxfmt's options (checked against `configuration_schema.json` at 0.64.0) say
 nothing about what follows an `if`, and Prettier never had such an option, so the linter adds the
-braces and the formatter splits the block. Applied to 452 sites in one revision; scoping to `src/`
-and `web/` was dropped because `evals/` is the largest share.
+braces and the formatter splits the block. 452 sites; scoping to `src/` and `web/` was rejected
+because `evals/` is the largest share.
