@@ -102,11 +102,15 @@ export function useMcpServers(open: Ref<boolean>) {
     openSignIn(body?.authUrl)
   }
 
-  async function remove(id: string): Promise<void> {
-    await mutate(`/api/mcp/servers/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  async function remove(id: string): Promise<boolean> {
+    return (await mutate(`/api/mcp/servers/${encodeURIComponent(id)}`, { method: 'DELETE' })) !== null
+  }
+
+  async function replace(id: string, name: string, url: string, bearer?: string): Promise<McpServer | null> {
+    return (await remove(id)) ? add(name, url, bearer) : null
   }
 
   onScopeDispose(stopPolling)
 
-  return { servers, busy, error, refresh, add, connect, remove }
+  return { servers, busy, error, refresh, add, replace, connect, remove }
 }

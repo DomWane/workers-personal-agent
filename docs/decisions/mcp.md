@@ -47,7 +47,9 @@ registry derives the id from the name, so names are unique and the prefix with t
 
 ## Servers are registered from settings
 
-Add, remove and connect go through `/api/mcp/*`; the OAuth callback is
+Add, remove and connect go through `/api/mcp/*`; an edit in the dialog is a remove and an add,
+because the SDK refuses a second registration under an id it already holds and a stored bearer
+cannot be read back to carry over. The OAuth callback is
 `/agents/mcp-client/<id>/callback`, the SDK's own convention, riding the user's browser
 session through Access. A bearer token is optional and stored as the SDK stores it, plaintext in DO
 SQL. Env-seeded servers were rejected: an OAuth server cannot be validated at deploy time.

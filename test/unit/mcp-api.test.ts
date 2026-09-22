@@ -55,6 +55,32 @@ describe('/api/mcp/servers', () => {
     expect(await api('GET', '/api/mcp/servers')).toEqual({ status: 200, body: { servers: [] } })
   })
 
+  it('an edit is a remove and an add: the same name comes back under a new url, connected from scratch', async () => {
+    const before = 'https://mcp-api.example/mcp'
+    const after = 'https://mcp-api-narrow.example/mcp/x/repos'
+    mockMcpServer(before, { posts: CONNECT_POSTS, gets: CONNECT_GETS })
+    mockMcpServer(after, { posts: CONNECT_POSTS, gets: CONNECT_GETS })
+
+    const first = (await api('POST', '/api/mcp/servers', { name: 'files', url: before })).body as {
+      server: McpServerView
+    }
+    expect(await api('DELETE', `/api/mcp/servers/${encodeURIComponent(first.server.id)}`)).toMatchObject({
+      status: 200,
+    })
+
+    const second = await api('POST', '/api/mcp/servers', { name: 'files', url: after })
+    expect(second.status).toBe(201)
+    expect((second.body as { server: McpServerView }).server).toMatchObject({
+      id: first.server.id,
+      url: after,
+      state: 'ready',
+    })
+    expect(await api('GET', '/api/mcp/servers')).toEqual({
+      status: 200,
+      body: { servers: [expect.objectContaining({ id: first.server.id, url: after, state: 'ready' })] },
+    })
+  })
+
   it('names the MCP client binding so the SDK routes its own OAuth callback', () => {
     // The SDK routes `/agents/<segment>/…` by the kebab-cased *binding* name and composes the
     // callback URL from the kebab-cased *class* name. Mutation check: rename the binding to

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { LoaderCircleIcon, PlugIcon, SettingsIcon, Trash2Icon } from '@lucide/vue'
+import { LoaderCircleIcon, PencilIcon, PlugIcon, SettingsIcon, Trash2Icon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -16,21 +16,29 @@ import { useMcpServers } from '@/useMcpServers'
 import type { McpServer } from '@/types/mcp'
 
 const open = ref(false)
-const { servers, busy, error, refresh, add, connect, remove } = useMcpServers(open)
+const { servers, busy, error, refresh, add, replace, connect, remove } = useMcpServers(open)
 
 const name = ref('')
 const url = ref('')
 const bearer = ref('')
+const editing = ref<string | null>(null)
+
+function load(server?: McpServer): void {
+  editing.value = server?.id ?? null
+  name.value = server?.name ?? ''
+  url.value = server?.url ?? ''
+  bearer.value = ''
+}
 
 async function submit(): Promise<void> {
   if (!name.value.trim() || !url.value.trim()) {
     return
   }
-  const server = await add(name.value, url.value, bearer.value)
+  const server = editing.value
+    ? await replace(editing.value, name.value, url.value, bearer.value)
+    : await add(name.value, url.value, bearer.value)
   if (server) {
-    name.value = ''
-    url.value = ''
-    bearer.value = ''
+    load()
   }
 }
 
@@ -86,15 +94,22 @@ const sorted = computed(() => [...servers.value].sort((a, b) => a.name.localeCom
           <Input
             v-model="bearer"
             type="password"
-            placeholder="Bearer token (only for key-authenticated servers)"
+            :placeholder="
+              editing
+                ? 'Bearer token (enter it again — saving reconnects from scratch)'
+                : 'Bearer token (only for key-authenticated servers)'
+            "
             aria-label="Bearer token"
             autocomplete="off"
           />
           <div class="flex items-center justify-end gap-2">
             <p v-if="error" class="text-muted-foreground mr-auto text-xs">{{ error }}</p>
+            <Button v-if="editing" type="button" variant="ghost" size="sm" :disabled="busy" @click="load()">
+              Cancel
+            </Button>
             <Button type="submit" size="sm" :disabled="busy || !name.trim() || !url.trim()">
               <LoaderCircleIcon v-if="busy" class="size-3.5 animate-spin" />
-              Add server
+              {{ editing ? 'Save server' : 'Add server' }}
             </Button>
           </div>
         </form>
@@ -126,6 +141,15 @@ const sorted = computed(() => [...servers.value].sort((a, b) => a.name.localeCom
               @click="connect(server.id)"
             >
               Sign in
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              :aria-label="`Edit ${server.name}`"
+              :disabled="busy"
+              @click="load(server)"
+            >
+              <PencilIcon class="size-4" />
             </Button>
             <Button
               variant="ghost"

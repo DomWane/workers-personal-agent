@@ -560,6 +560,10 @@ Walked with a bearer-token example server on 2026-09-07:
   the model answers using it, and under the answer the thread shows the tool used
 - the server's own Durable Object is the one that talked to it, so the *chat* turn's `subrequests` count does not
   climb with MCP calls; the log's `mcpTools` field is the number of server tools the turn held
+- edit the server (the pencil on its row): the form fills with its name and URL and the bearer
+  field empties, because an edit is a remove and an add, so a key-authenticated server needs its
+  token typed again; **Save server** reconnects it and the row settles on **Ready** under the new
+  URL.
 - remove the server in Settings: the row disappears, and the very next message no longer offers
   the tools (the catalog is fetched per turn, so there is no stale cache to wait out)
 
