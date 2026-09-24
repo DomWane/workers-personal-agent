@@ -26,6 +26,7 @@ import { FREE_PLAN_SUBREQUESTS, SubrequestBudget } from '@/agent/subrequest-budg
 import { applySubrequestLimit } from '@/agent/workers-plan'
 import * as research from '@/agent/research/commands'
 import { runToolLoop, toHistoryMessage, turnToolTraffic, type StopReason } from '@/agent/loop/tool-loop'
+import { throttle } from '@/agent/throttle'
 import { buildTools } from '@/agent/tools'
 import type { ToolContext, ToolDef } from '@/agent/tools/registry'
 import type {
@@ -77,6 +78,8 @@ function toChatMessages(history: HistoryMessage[], log?: TurnLog): ChatMessage[]
 }
 
 const SKILL_COMMAND_RE = /^\/([a-z][\w-]{1,63})(?:@\w+)?(?:\s+([\s\S]+))?$/i
+
+const DRAFT_BROADCAST_MS = 250
 
 export class PersonalAgent extends Agent<Env, AgentState> {
   initialState: AgentState = { messages: [] }
@@ -169,7 +172,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       await this.clearStatusIfIdle(payload.id)
       log.event({ at: 'turn', ...turnFields(outcome), subrequests: budget.spent })
     } catch (err) {
-      this.setState({ ...this.state, live: undefined })
+      this.setState({ ...this.state, live: undefined, draft: undefined })
       await this.clearStatusIfIdle(payload.id)
       log.error({
         at: 'turn',
@@ -207,7 +210,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       return
     }
     this.newLog('schedule').event({ at: 'turn', stage: 'status-orphaned', status: this.state.status })
-    this.setState({ ...this.state, status: undefined, live: undefined })
+    this.setState({ ...this.state, status: undefined, live: undefined, draft: undefined })
   }
 
   @callable()
@@ -378,6 +381,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
     const client = this.llm(budget)
     const { tools, mcpTools } = await this.turnTools(log)
     let live: HistoryMessage[] = []
+    const draft = throttle<string>(DRAFT_BROADCAST_MS, (text) => this.setState({ ...this.state, draft: text }))
     const {
       text: reply,
       toolsUsed,
@@ -400,11 +404,13 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       ctx: this.toolContext(budget, log, opts.userMessageId ? persistedUser : ownTurn),
       subrequests: budget,
       log,
+      onText: draft.push,
       onMessage: (m) => {
+        draft.cancel()
         live = [...live, toHistoryMessage(m, Date.now())]
-        this.setState({ ...this.state, live })
+        this.setState({ ...this.state, live, draft: undefined })
       },
-    })
+    }).finally(() => draft.cancel())
 
     const combined: HistoryMessage[] = [
       ...this.state.messages,
@@ -424,6 +430,7 @@ export class PersonalAgent extends Agent<Env, AgentState> {
       ...this.state,
       messages: combined,
       live: undefined,
+      draft: undefined,
       promptTokens,
       ...(toolsUsed.includes('update_user_profile') ? { userProfile: undefined } : {}),
       ...(toolsUsed.includes('update_agent_notes') ? { agentNotes: undefined } : {}),

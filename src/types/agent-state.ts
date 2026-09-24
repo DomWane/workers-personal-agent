@@ -13,4 +13,5 @@ export interface AgentState {
   research?: ResearchState
   status?: 'thinking' | 'compacting'
   live?: HistoryMessage[]
+  draft?: string
 }

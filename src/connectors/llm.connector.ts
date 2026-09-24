@@ -43,6 +43,20 @@ export async function chatCompletion(
   return (completion as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content?.trim() ?? ''
 }
 
+async function streamed(
+  client: OpenAI,
+  body: Record<string, unknown>,
+  timeout: number,
+  onText: (text: string) => void,
+): Promise<unknown> {
+  const stream = client.chat.completions.stream(
+    { ...body, stream: true, stream_options: { include_usage: true } } as never,
+    { timeout },
+  )
+  stream.on('content', (_delta, snapshot) => onText(snapshot))
+  return stream.finalChatCompletion()
+}
+
 export interface CompletionUsage {
   inputTokens?: number
   outputTokens?: number
@@ -62,12 +76,14 @@ export async function chatCompletionWithTools(
   model: string,
   messages: ChatMessage[],
   tools: object[],
-  opts: ChatOptions & { toolChoice?: 'auto' | 'none' } = {},
+  opts: ChatOptions & { toolChoice?: 'auto' | 'none'; onText?: (text: string) => void } = {},
 ): Promise<CompletionResult> {
-  const { timeoutMs = 120_000, toolChoice = 'auto' } = opts
+  const { timeoutMs = 120_000, toolChoice = 'auto', onText } = opts
   const body = buildBody(model, messages, opts, { tools, tool_choice: toolChoice })
 
-  const completion = await client.chat.completions.create(body as never, { timeout: timeoutMs })
+  const completion = onText
+    ? await streamed(client, body, timeoutMs, onText)
+    : await client.chat.completions.create(body as never, { timeout: timeoutMs })
   const raw = completion as {
     provider?: string
     usage?: {

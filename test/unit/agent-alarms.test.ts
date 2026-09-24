@@ -44,9 +44,11 @@ describe('processWebMessage', () => {
       .reply(500, { message: 'boom' }, { headers: { 'content-type': 'application/json' } })
 
     await runInDurableObject(stub, async (agent: PersonalAgent) => {
+      agent.setState({ ...agent.state, draft: 'half a sentence' })
       await agent.processWebMessage({ text: 'hi' })
       // A turn that failed must still say so: silence is indistinguishable from one still thinking.
       expect(agent.state.messages.at(-1)?.content).toContain('Sorry')
+      expect(agent.state.draft).toBeUndefined()
     })
   })
 })

@@ -15,7 +15,9 @@ export interface Turn {
   final?: SpokenMessage
 }
 
-export function groupTurns(messages: HistoryMessage[]): Turn[] {
+export const DRAFT_ID = 'draft'
+
+export function groupTurns(messages: HistoryMessage[], draft?: string): Turn[] {
   const turns: Turn[] = []
   const pending = new Map<string, ToolStep>()
   let open: Turn | null = null
@@ -53,6 +55,10 @@ export function groupTurns(messages: HistoryMessage[]): Turn[] {
     if (!m.tool_calls?.length) {
       close(m)
     }
+  }
+  if (draft) {
+    open ??= { from: 'assistant', id: DRAFT_ID, segments: [] }
+    open.segments.push({ kind: 'text', message: { role: 'assistant', content: draft, id: DRAFT_ID } })
   }
   close()
   return turns

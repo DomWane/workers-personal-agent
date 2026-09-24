@@ -76,7 +76,9 @@ and is a broken fixture. That mistake is why the numbers are computed rather tha
 Open `http://localhost:8787/`, type anything, send.
 
 - the message appears **before** the answer, with *Thinking…* under it
-- the answer renders as markdown
+- the answer arrives a few words at a time under the indicator (the stub streams when asked to,
+  one word per `STUB_DELAY_MS / 10`, at least 20 ms), then settles as one message with markdown
+  rendered
 - a thread appears in the sidebar named after the first message, and the URL gains `?t=t-…`
 - the meter reads a measured number — hover it: *counted by the provider*, not *estimated*
 

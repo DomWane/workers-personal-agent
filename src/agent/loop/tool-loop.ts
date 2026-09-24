@@ -82,6 +82,7 @@ export interface ToolLoopInput {
   subrequests?: SubrequestBudget
   forceFinalAnswer?: boolean
   onMessage?: (message: LoopMessage) => void
+  onText?: (text: string) => void
 }
 
 type LoopMessage = Extract<ChatMessage, { role: 'assistant' | 'tool' }>
@@ -234,7 +235,7 @@ export async function runToolLoop(input: ToolLoopInput): Promise<LoopResult> {
       }
       roundsUsed = round + 1
       const roundStarted = Date.now()
-      const result = await chatCompletionWithTools(client, model, messages, specs)
+      const result = await chatCompletionWithTools(client, model, messages, specs, { onText: input.onText })
       const { content, toolCalls } = result
       if (round === 0) {
         promptTokens = result.usage?.inputTokens
@@ -361,7 +362,10 @@ export async function runToolLoop(input: ToolLoopInput): Promise<LoopResult> {
   }
 
   const finalStarted = Date.now()
-  const final = await chatCompletionWithTools(client, model, messages, specs, { toolChoice: 'none' })
+  const final = await chatCompletionWithTools(client, model, messages, specs, {
+    toolChoice: 'none',
+    onText: input.onText,
+  })
   logCompletion(log, 'final', roundsUsed, model, final, Date.now() - finalStarted)
   tokensSpent += (final.usage?.inputTokens ?? 0) + (final.usage?.outputTokens ?? 0)
   const reason = stopReason ?? 'max-rounds'

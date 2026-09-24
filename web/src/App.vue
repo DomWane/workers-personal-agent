@@ -181,7 +181,7 @@ function rememberSplit(sizes: number[]) {
   }
 }
 
-const turns = computed(() => groupTurns([...state.value.messages, ...(state.value.live ?? [])]))
+const turns = computed(() => groupTurns([...state.value.messages, ...(state.value.live ?? [])], state.value.draft))
 
 function stepState(step: ToolStep): ToolState {
   if (!step.result) {

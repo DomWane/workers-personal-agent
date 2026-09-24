@@ -85,6 +85,21 @@ describe('runToolLoop', () => {
     expect(msgs.at(-2)).toMatchObject({ role: 'assistant' })
   })
 
+  it('streams the text of every round to onText, the forced final included', async () => {
+    queueResponse({
+      content: 'Looking that up',
+      tool_calls: [{ id: 'c1', type: 'function', function: { name: 'echo', arguments: '{"text":"hi"}' } }],
+    })
+    queueResponse({ content: 'done' })
+    const seen: string[] = []
+
+    const out = await loop([echoTool], { maxRounds: 1, onText: (t) => seen.push(t) })
+
+    expect(out).toMatchObject({ text: 'done', stopReason: 'max-rounds', roundsUsed: 1 })
+    expect(seen).toContain('Looking that up')
+    expect(seen.at(-1)).toBe('done')
+  })
+
   it('hands each step and each result to onMessage as it happens, and never the final answer', async () => {
     queueResponse({
       content: 'Looking that up',

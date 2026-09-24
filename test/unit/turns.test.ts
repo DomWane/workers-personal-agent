@@ -71,6 +71,21 @@ describe('groupTurns', () => {
     expect(turns[3].segments).toEqual([{ kind: 'text', message: expect.objectContaining({ id: 'a2' }) }])
   })
 
+  it('appends the draft to the open turn, and opens one for it when nothing is running', () => {
+    const open = groupTurns([user('u1'), step('a1', '', [call('c1')])], 'Writing')
+    expect(open[1].segments.at(-1)).toEqual({
+      kind: 'text',
+      message: { role: 'assistant', content: 'Writing', id: 'draft' },
+    })
+    expect(open[1].final).toBeUndefined()
+
+    const alone = groupTurns([user('u1')], 'Writing')
+    expect(alone.map((t) => t.id)).toEqual(['u1', 'draft'])
+    expect(alone[1].final).toBeUndefined()
+
+    expect(groupTurns([user('u1'), answer('a1')], 'Writing').map((t) => t.id)).toEqual(['u1', 'a1', 'draft'])
+  })
+
   it('treats an empty tool_calls list as an answer, the way the thread filter does', () => {
     const turns = groupTurns([{ role: 'assistant', content: 'plain', id: 'a1', tool_calls: [] }])
     expect(turns[0]).toMatchObject({ id: 'a1', final: { id: 'a1' } })

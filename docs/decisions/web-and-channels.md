@@ -84,6 +84,21 @@ beside its result. **Rejected:** showing only the final round's text. Seen 2026-
 wrote its answer beside a `save_memory` call, then said "Saved."; the answer was persisted with the
 call and hidden with it.
 
+## The round being written streams into `state.draft`
+
+`runTurn` asks the provider for a stream; the text snapshot goes through a trailing 250 ms throttle
+into `draft` (the first token shows a window late, the latest snapshot wins), `groupTurns` draws it
+as the open turn's last segment, and the step that ends the round replaces it. The SDK's stream
+helper assembles the chunks into the completion the non-streamed path returns. Measured 2026-09-22
+with `curl` against `/ai/v1/chat/completions` on `@cf/zai-org/glm-4.7-flash`: Workers AI answers
+in OpenAI chunks, a tool call arrives whole in one chunk carrying `index`, `usage` is per chunk
+with the total on the last one, and reasoning arrives as `reasoning` deltas. OpenRouter is
+inferred from its OpenAI-compatible API, not measured. The SDK's `timeout` covers the headers only
+(`fetchWithTimeout` in `openai/client.js` clears its timer once the response arrives), so a
+streamed round has no bound on reading the body. Only `runTurn` streams: scouts, reflection and
+scheduled tasks have no reader. **Rejected:** streaming every call: it changes no behaviour and
+costs every completions mock its JSON shape. **Not built:** showing reasoning deltas.
+
 ## RPC failures surface as toasts
 
 Raised in `useAgent`'s `rpc`, which returns `false` rather than throwing: every caller is a click,

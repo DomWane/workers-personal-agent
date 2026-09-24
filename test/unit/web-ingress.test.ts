@@ -1,6 +1,6 @@
 import { env, fetchMock, runInDurableObject } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { PersonalAgent } from '@/agent/personal-agent'
 import type { Env, WebMessagePayload } from '@/types'
 import { completionReply, type CompletionMessage } from '../helpers/llm'
@@ -100,9 +100,10 @@ describe('waking up', () => {
     const stub = await freshAgent()
     await runInDurableObject(stub, async (agent: PersonalAgent) => {
       // What a lost turn leaves behind: the status the enqueue wrote, and no alarm behind it.
-      agent.setState({ ...agent.state, status: 'thinking' })
+      agent.setState({ ...agent.state, status: 'thinking', draft: 'half a sentence' })
       await agent.onStart()
       expect(agent.state.status).toBeUndefined()
+      expect(agent.state.draft).toBeUndefined()
     })
   })
 
@@ -243,6 +244,35 @@ describe('setModel', () => {
 })
 
 describe('the running turn', () => {
+  it('clears the draft when the answer lands, and the streamed call costs one subrequest', async () => {
+    const stub = await freshAgent()
+    replyOnce('Nothing is scheduled.')
+    const lines: string[] = []
+    const spy = vi.spyOn(console, 'log').mockImplementation((m: unknown) => void lines.push(String(m)))
+    try {
+      await runInDurableObject(stub, async (agent: PersonalAgent) => {
+        await agent.enqueueWebMessage('anything due?')
+        const [scheduled] = await takeSchedules(agent, 'processWebMessage')
+        agent.setState({ ...agent.state, draft: 'Nothing is' })
+
+        await agent.processWebMessage(scheduled.payload as WebMessagePayload)
+
+        expect(agent.state.draft).toBeUndefined()
+        expect(agent.state.messages.at(-1)).toMatchObject({ role: 'assistant', content: 'Nothing is scheduled.' })
+      })
+    } finally {
+      spy.mockRestore()
+    }
+    const records = lines.flatMap((l): Record<string, unknown>[] => {
+      try {
+        return [JSON.parse(l) as Record<string, unknown>]
+      } catch {
+        return []
+      }
+    })
+    expect(records.find((r) => r.at === 'turn')).toMatchObject({ outcome: 'ok', subrequests: 1 })
+  })
+
   it('shows each step live, then folds them into the thread when the answer lands', async () => {
     const stub = await freshAgent()
     await runInDurableObject(stub, async (agent: PersonalAgent) => {

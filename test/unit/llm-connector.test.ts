@@ -1,6 +1,7 @@
 import { fetchMock } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { chatCompletion, chatCompletionWithTools, createLlmClient } from '@/connectors/llm.connector'
+import { completionReply } from '../helpers/llm'
 
 beforeAll(() => {
   fetchMock.activate()
@@ -201,5 +202,54 @@ describe('chatCompletionWithTools', () => {
     expect(out.finishReason).toBeUndefined()
     expect(out.provider).toBeUndefined()
     expect(out.content).toBe('ok')
+  })
+})
+
+describe('chatCompletionWithTools, streamed', () => {
+  const client = () => createLlmClient('k', `${BASE}/v1`)
+  const ask = [{ role: 'user' as const, content: 'hi' }]
+
+  it('hands the growing text to onText and returns what the chunks add up to', async () => {
+    let sent: Record<string, unknown> | undefined
+    fetchMock
+      .get(BASE)
+      .intercept({ method: 'POST', path: '/v1/chat/completions' })
+      .reply(
+        completionReply(
+          {
+            message: {
+              content: 'Hello there',
+              tool_calls: [{ id: 'c1', type: 'function', function: { name: 'echo', arguments: '{}' } }],
+            },
+            usage: { prompt_tokens: 7, completion_tokens: 8, completion_tokens_details: { reasoning_tokens: 3 } },
+            extra: { provider: 'Wafer' },
+          },
+          (b) => (sent = b),
+        ),
+      )
+    const seen: string[] = []
+
+    const out = await chatCompletionWithTools(client(), 'm', ask, [], { onText: (t) => seen.push(t) })
+
+    expect(sent).toMatchObject({ stream: true, stream_options: { include_usage: true } })
+    expect(seen).toEqual(['Hello ', 'Hello there'])
+    expect(out).toMatchObject({
+      content: 'Hello there',
+      finishReason: 'tool_calls',
+      provider: 'Wafer',
+      usage: { inputTokens: 7, outputTokens: 8, reasoningTokens: 3 },
+    })
+    expect(out.toolCalls).toEqual([expect.objectContaining({ id: 'c1', function: { name: 'echo', arguments: '{}' } })])
+  })
+
+  it('asks for a plain completion when nobody listens', async () => {
+    let sent: Record<string, unknown> | undefined
+    fetchMock
+      .get(BASE)
+      .intercept({ method: 'POST', path: '/v1/chat/completions' })
+      .reply(completionReply({ message: { content: 'ok' } }, (b) => (sent = b)))
+
+    await expect(chatCompletionWithTools(client(), 'm', ask, [])).resolves.toMatchObject({ content: 'ok' })
+    expect(sent).not.toHaveProperty('stream')
   })
 })

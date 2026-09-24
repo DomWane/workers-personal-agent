@@ -131,16 +131,47 @@ createServer((req, res) => {
         }),
       )
     }
-    const wanted = process.env.STUB_TOOLS === '1' ? toolTurn(JSON.parse(body)) : null
-    const payload = JSON.stringify(
-      wanted ?? {
-        choices: [{ message: { content: reply(body) } }],
-        // Measured rather than estimated, so the meter is exercised on the path production takes.
-        usage: { prompt_tokens: Number(process.env.STUB_PROMPT_TOKENS ?? 1200) },
-      },
-    )
+    const request = JSON.parse(body)
+    const wanted = process.env.STUB_TOOLS === '1' ? toolTurn(request) : null
+    const completion = wanted ?? {
+      choices: [{ message: { content: reply(body) } }],
+      // Measured rather than estimated, so the meter is exercised on the path production takes.
+      usage: { prompt_tokens: Number(process.env.STUB_PROMPT_TOKENS ?? 1200) },
+    }
+    if (request.stream) {
+      return streamCompletion(res, completion)
+    }
     // STUB_DELAY_MS is how the in-flight states — "Thinking…", "Compacting…" — stay on screen long
     // enough to look at.
-    setTimeout(() => res.end(payload), delayMs)
+    setTimeout(() => res.end(JSON.stringify(completion)), delayMs)
   })
 }).listen(port, () => console.log(`stub llm on http://127.0.0.1:${port} (delay ${delayMs}ms)`))
+
+function streamCompletion(res, completion) {
+  res.setHeader('content-type', 'text/event-stream')
+  const message = completion.choices[0].message
+  const chunk = (choices, more = {}) =>
+    res.write(
+      `data: ${JSON.stringify({ id: 'stub', object: 'chat.completion.chunk', model: 'stub', ...more, choices })}\n\n`,
+    )
+  const delta = (d, finish_reason = null) => chunk([{ index: 0, delta: d, finish_reason }])
+  const words = message.content ? message.content.split(/(?<=\s)/) : []
+  const calls = message.tool_calls ?? []
+  const step = Math.max(20, delayMs / 10)
+  const tick = () => {
+    const word = words.shift()
+    if (word !== undefined) {
+      delta({ content: word })
+      return setTimeout(tick, step)
+    }
+    if (calls.length) {
+      delta({ tool_calls: calls.map((c, index) => ({ index, ...c })) })
+    }
+    delta({}, calls.length ? 'tool_calls' : 'stop')
+    chunk([], { usage: completion.usage })
+    res.write('data: [DONE]\n\n')
+    res.end()
+  }
+  delta({ role: 'assistant', content: '' })
+  setTimeout(tick, delayMs)
+}
