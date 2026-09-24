@@ -5,6 +5,7 @@ import type { PersonalAgent } from '@/agent/personal-agent'
 import { appendArchive, readArchive, type CompactionRecord } from '@/agent/archive'
 import { sqlTag } from '@/agent/archive'
 import type { AgentState, Env, HistoryMessage } from '@/types'
+import { completionReply } from '../helpers/llm'
 import { readVault } from '../helpers/vault'
 
 beforeAll(() => {
@@ -44,14 +45,7 @@ function mockCompletion(reply: string, capture?: (b: Record<string, unknown>) =>
   fetchMock
     .get('https://llm.example')
     .intercept({ method: 'POST', path: '/v1/chat/completions' })
-    .reply(
-      200,
-      ({ body }) => {
-        capture?.(JSON.parse(body as string) as Record<string, unknown>)
-        return { choices: [{ message: { content: reply } }] }
-      },
-      { headers: { 'content-type': 'application/json' } },
-    )
+    .reply(completionReply({ message: { content: reply } }, capture))
 }
 
 const archiveOf = (state: DurableObjectState) => readArchive(sqlTag(state.storage.sql))
@@ -138,20 +132,14 @@ describe('what a turn sends the model', () => {
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
       .reply(
-        200,
-        () => ({
-          choices: [
-            {
-              message: {
-                content: null,
-                tool_calls: [
-                  { id: 'c1', type: 'function', function: { name: 'read_tool_result', arguments: '{"ref":1}' } },
-                ],
-              },
-            },
-          ],
+        completionReply({
+          message: {
+            content: null,
+            tool_calls: [
+              { id: 'c1', type: 'function', function: { name: 'read_tool_result', arguments: '{"ref":1}' } },
+            ],
+          },
         }),
-        { headers: { 'content-type': 'application/json' } },
       )
     mockCompletion('answered')
 
@@ -442,13 +430,7 @@ describe('runCompactHistory', () => {
     fetchMock
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(
-        200,
-        { choices: [{ message: { content: 'summary of turns nobody has any more' } }] },
-        {
-          headers: { 'content-type': 'application/json' },
-        },
-      )
+      .reply(completionReply({ message: { content: 'summary of turns nobody has any more' } }))
       .delay(100)
 
     const lines: string[] = []
@@ -502,32 +484,23 @@ describe('what a memory saved during a turn can point at', () => {
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
       .reply(
-        200,
-        {
-          choices: [
-            {
-              message: {
-                content: null,
-                tool_calls: [
-                  {
-                    id: 'c1',
-                    type: 'function',
-                    function: {
-                      name: 'save_memory',
-                      arguments: '{"name":"Sam in Brno","description":"moved to Brno","content":"Since August."}',
-                    },
-                  },
-                ],
+        completionReply({
+          message: {
+            content: null,
+            tool_calls: [
+              {
+                id: 'c1',
+                type: 'function',
+                function: {
+                  name: 'save_memory',
+                  arguments: '{"name":"Sam in Brno","description":"moved to Brno","content":"Since August."}',
+                },
               },
-            },
-          ],
-        },
-        { headers: { 'content-type': 'application/json' } },
+            ],
+          },
+        }),
       )
-    fetchMock
-      .get('https://llm.example')
-      .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(200, { choices: [{ message: { content: 'noted' } }] }, { headers: { 'content-type': 'application/json' } })
+    mockCompletion('noted')
 
     let turnId: string | undefined
     await runInDurableObject(stub, async (agent: PersonalAgent) => {
@@ -708,11 +681,7 @@ describe('compactNow', () => {
     fetchMock
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(
-        200,
-        { choices: [{ message: { content: 'Folded.' } }] },
-        { headers: { 'content-type': 'application/json' } },
-      )
+      .reply(completionReply({ message: { content: 'Folded.' } }))
       .delay(100)
 
     await runInDurableObject(stub, async (agent: PersonalAgent) => {
@@ -811,20 +780,8 @@ describe('a provider refusing the prompt for its size', () => {
       },
     )
     // The compaction the overflow forces, then the retried turn.
-    llm.intercept({ method: 'POST', path: '/v1/chat/completions' }).reply(
-      200,
-      { choices: [{ message: { content: 'Summary of the head.' } }] },
-      {
-        headers: { 'content-type': 'application/json' },
-      },
-    )
-    llm.intercept({ method: 'POST', path: '/v1/chat/completions' }).reply(
-      200,
-      { choices: [{ message: { content: 'answered after compaction' } }] },
-      {
-        headers: { 'content-type': 'application/json' },
-      },
-    )
+    mockCompletion('Summary of the head.')
+    mockCompletion('answered after compaction')
 
     const lines: string[] = []
     const spy = vi.spyOn(console, 'log').mockImplementation((m: unknown) => void lines.push(String(m)))

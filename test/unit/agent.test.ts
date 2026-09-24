@@ -2,6 +2,7 @@ import { createExecutionContext, env, fetchMock, SELF } from 'cloudflare:test'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import worker from '@/index'
 import type { Env } from '@/types'
+import { completionReply } from '../helpers/llm'
 import { readVault, seedVault } from '../helpers/vault'
 
 beforeAll(() => {
@@ -16,14 +17,7 @@ function mockCompletion(reply: string, capture?: (body: Record<string, unknown>)
   fetchMock
     .get(LLM_BASE)
     .intercept({ method: 'POST', path: '/v1/chat/completions' })
-    .reply(
-      200,
-      ({ body }) => {
-        capture?.(JSON.parse(body as string))
-        return { choices: [{ message: { content: reply } }] }
-      },
-      { headers: { 'content-type': 'application/json' } },
-    )
+    .reply(completionReply({ message: { content: reply } }, capture))
 }
 
 async function devChat(text: string, thread = crypto.randomUUID()) {
@@ -232,18 +226,9 @@ describe('core memory invalidation after a write', () => {
       .get(LLM_BASE)
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
       .reply(
-        200,
-        {
-          choices: [
-            {
-              message: {
-                content: null,
-                tool_calls: [{ id: 'c1', type: 'function', function: { name, arguments: args } }],
-              },
-            },
-          ],
-        },
-        { headers: { 'content-type': 'application/json' } },
+        completionReply({
+          message: { content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name, arguments: args } }] },
+        }),
       )
   }
 

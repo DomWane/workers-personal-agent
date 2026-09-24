@@ -7,6 +7,7 @@ import { FINAL_ANSWER_RESERVE, PRUNE_OVER_CHARS, runToolLoop, turnToolTraffic } 
 import { resultCap } from '@/agent/loop/context-window'
 import { rethrowIfExhausted, SubrequestBudget } from '@/agent/subrequest-budget'
 import { defineTool, type ToolContext, type ToolDef } from '@/agent/tools/registry'
+import { completionReply, type CompletionMessage } from '../helpers/llm'
 
 beforeAll(() => {
   fetchMock.activate()
@@ -21,9 +22,7 @@ function queueResponse(msg: Record<string, unknown>, capture?: (b: Record<string
   fetchMock
     .get(BASE)
     .intercept({ method: 'POST', path: '/v1/chat/completions' })
-    .reply(200, ({ body }) => (capture?.(JSON.parse(body as string)), { choices: [{ message: msg }] }), {
-      headers: { 'content-type': 'application/json' },
-    })
+    .reply(completionReply({ message: msg as CompletionMessage }, capture))
 }
 
 const echoTool: ToolDef = defineTool({

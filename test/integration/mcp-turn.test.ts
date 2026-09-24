@@ -5,6 +5,7 @@ import { mcpRegistry } from '@/agent/mcp/registry'
 import type { McpClientRpc } from '@/agent/mcp/client'
 import type { PersonalAgent } from '@/agent/personal-agent'
 import type { Env } from '@/types'
+import { completionReply, type CompletionMessage } from '../helpers/llm'
 import { CONNECT_GETS, CONNECT_POSTS, mockMcpServer } from '../helpers/mcp-server'
 
 beforeAll(() => {
@@ -19,18 +20,11 @@ afterEach(() => {
 const testEnv = env as Env
 const LLM_BASE = 'https://llm.example'
 
-function queueLlm(msg: Record<string, unknown>, capture?: (body: Record<string, unknown>) => void) {
+function queueLlm(message: CompletionMessage, capture?: (body: Record<string, unknown>) => void) {
   fetchMock
     .get(LLM_BASE)
     .intercept({ method: 'POST', path: '/v1/chat/completions' })
-    .reply(
-      200,
-      ({ body }) => {
-        capture?.(JSON.parse(body as string) as Record<string, unknown>)
-        return { choices: [{ message: msg }] }
-      },
-      { headers: { 'content-type': 'application/json' } },
-    )
+    .reply(completionReply({ message }, capture))
 }
 
 describe('an MCP tool inside a chat turn', () => {

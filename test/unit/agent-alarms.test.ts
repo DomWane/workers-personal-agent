@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { type PersonalAgent } from '@/agent/personal-agent'
 import type { Env } from '@/types'
 import { VaultStore } from '@/agent/memory/vault-store'
+import { completionReply } from '../helpers/llm'
 import { seedVault } from '../helpers/vault'
 
 beforeAll(() => {
@@ -27,11 +28,7 @@ describe('processWebMessage', () => {
     fetchMock
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(
-        200,
-        { choices: [{ message: { content: 'hi Sam' } }] },
-        { headers: { 'content-type': 'application/json' } },
-      )
+      .reply(completionReply({ message: { content: 'hi Sam' } }))
 
     await runInDurableObject(stub, async (agent: PersonalAgent) => {
       await agent.processWebMessage({ text: 'hi' })
@@ -115,11 +112,7 @@ describe('swallowed failures inside a turn', () => {
     fetchMock
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(
-        200,
-        { choices: [{ message: { content: 'still answered' } }] },
-        { headers: { 'content-type': 'application/json' } },
-      )
+      .reply(completionReply({ message: { content: 'still answered' } }))
     const lines: string[] = []
     const spy = vi.spyOn(console, 'log').mockImplementation((m: unknown) => void lines.push(String(m)))
     try {
@@ -157,11 +150,7 @@ describe('the turn record carries why the loop stopped', () => {
     fetchMock
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(
-        200,
-        { choices: [{ message: { content: 'hi Sam' } }] },
-        { headers: { 'content-type': 'application/json' } },
-      )
+      .reply(completionReply({ message: { content: 'hi Sam' } }))
     const lines: string[] = []
     const spy = vi.spyOn(console, 'log').mockImplementation((m: unknown) => void lines.push(String(m)))
     try {
@@ -199,29 +188,19 @@ describe('the deployment decides whether content is logged', () => {
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
       .reply(
-        200,
-        {
-          choices: [
-            {
-              message: {
-                content: null,
-                tool_calls: [
-                  { id: 'c1', type: 'function', function: { name: 'search_memory', arguments: '{"query":"tea"}' } },
-                ],
-              },
-            },
-          ],
-        },
-        { headers: { 'content-type': 'application/json' } },
+        completionReply({
+          message: {
+            content: null,
+            tool_calls: [
+              { id: 'c1', type: 'function', function: { name: 'search_memory', arguments: '{"query":"tea"}' } },
+            ],
+          },
+        }),
       )
     fetchMock
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(
-        200,
-        { choices: [{ message: { content: 'you prefer tea' } }] },
-        { headers: { 'content-type': 'application/json' } },
-      )
+      .reply(completionReply({ message: { content: 'you prefer tea' } }))
     const lines: string[] = []
     const spy = vi.spyOn(console, 'log').mockImplementation((m: unknown) => void lines.push(String(m)))
     try {
@@ -257,11 +236,7 @@ describe('failures inside a turn stay attached to it', () => {
     fetchMock
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(
-        200,
-        { choices: [{ message: { content: 'answered anyway' } }] },
-        { headers: { 'content-type': 'application/json' } },
-      )
+      .reply(completionReply({ message: { content: 'answered anyway' } }))
     const lines: string[] = []
     const spy = vi.spyOn(console, 'log').mockImplementation((m: unknown) => void lines.push(String(m)))
     try {
@@ -298,11 +273,7 @@ describe('turn correlation end to end', () => {
     fetchMock
       .get('https://llm.example')
       .intercept({ method: 'POST', path: '/v1/chat/completions' })
-      .reply(
-        200,
-        { choices: [{ message: { content: 'hi Sam' } }] },
-        { headers: { 'content-type': 'application/json' } },
-      )
+      .reply(completionReply({ message: { content: 'hi Sam' } }))
     const lines: string[] = []
     const spy = vi.spyOn(console, 'log').mockImplementation((m: unknown) => void lines.push(String(m)))
     try {

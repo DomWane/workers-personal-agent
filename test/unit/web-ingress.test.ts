@@ -3,6 +3,7 @@ import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { PersonalAgent } from '@/agent/personal-agent'
 import type { Env, WebMessagePayload } from '@/types'
+import { completionReply, type CompletionMessage } from '../helpers/llm'
 
 beforeAll(() => {
   fetchMock.activate()
@@ -29,14 +30,12 @@ async function takeSchedules(agent: PersonalAgent, callback: string) {
 const disarmAlarm = (agent: PersonalAgent) =>
   (agent as unknown as { ctx: DurableObjectState }).ctx.storage.deleteAlarm()
 
-function replyOnce(reply: string | Record<string, unknown>, capture?: (body: string) => void) {
+function replyOnce(reply: string | CompletionMessage, capture?: (body: Record<string, unknown>) => void) {
   const message = typeof reply === 'string' ? { content: reply } : reply
   fetchMock
     .get('https://llm.example')
     .intercept({ method: 'POST', path: '/v1/chat/completions' })
-    .reply(200, ({ body }) => (capture?.(body as string), { choices: [{ message }] }), {
-      headers: { 'content-type': 'application/json' },
-    })
+    .reply(completionReply({ message }, capture))
 }
 
 describe('enqueueWebMessage', () => {
@@ -123,7 +122,7 @@ describe('waking up', () => {
 describe('processWebMessage', () => {
   it('answers into state without duplicating the user turn', async () => {
     const stub = await freshAgent()
-    let sent: string | undefined
+    let sent: Record<string, unknown> | undefined
     replyOnce('hi from web', (body) => {
       sent = body
     })
@@ -143,13 +142,13 @@ describe('processWebMessage', () => {
 
     // The turn the enqueue persisted must reach the model exactly once: appending it again for
     // the request is the other half of the double-append trap.
-    const request = JSON.parse(sent ?? '{}') as { messages: { role: string; content: string }[] }
+    const request = sent as { messages: { role: string; content: string }[] }
     expect(request.messages.filter((m) => m.role === 'user' && m.content === 'hello')).toHaveLength(1)
   })
 
   it('answers each of two queued messages as its own turn', async () => {
     const stub = await freshAgent()
-    const sent: string[] = []
+    const sent: Record<string, unknown>[] = []
     replyOnce('first answer', (b) => sent.push(b))
     replyOnce('second answer', (b) => sent.push(b))
 
@@ -169,7 +168,7 @@ describe('processWebMessage', () => {
     })
 
     const prompts = sent.map((body) =>
-      (JSON.parse(body) as { messages: { role: string; content: string }[] }).messages
+      (body as { messages: { role: string; content: string }[] }).messages
         .slice(1)
         .map((m) => `${m.role}:${m.content}`),
     )

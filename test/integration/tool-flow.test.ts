@@ -3,6 +3,7 @@ import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { PersonalAgent } from '@/agent/personal-agent'
 import type { Env } from '@/types'
+import { completionReply, type CompletionMessage } from '../helpers/llm'
 
 beforeAll(() => {
   fetchMock.activate()
@@ -14,11 +15,11 @@ const LLM_BASE = 'https://llm.example'
 
 const freshAgent = (name: string) => getAgentByName((env as Env).PERSONAL_AGENT, `${name}-${crypto.randomUUID()}`)
 
-function queueLlm(msg: Record<string, unknown>) {
+function queueLlm(message: CompletionMessage) {
   fetchMock
     .get(LLM_BASE)
     .intercept({ method: 'POST', path: '/v1/chat/completions' })
-    .reply(200, { choices: [{ message: msg }] }, { headers: { 'content-type': 'application/json' } })
+    .reply(completionReply({ message }))
 }
 
 /** Every path here ends in broadcast state, so the assistant's last word is the assertion. */
