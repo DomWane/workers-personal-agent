@@ -5,6 +5,7 @@ description = "Offline evaluation of the agent's memory retrieval: retrievers, l
 requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.5.3",
+    "pystemmer>=3.1.0",
 ]
 
 [dependency-groups]
@@ -27,6 +28,7 @@ ignore = ["PLR2004", "PLR0913"]
 
 [tool.ruff.lint.per-file-ignores]
 "lib/http.py" = ["ANN401"]
+"typings/*.pyi" = ["N802", "N803"]
 
 [tool.ruff.format]
 quote-style = "single"

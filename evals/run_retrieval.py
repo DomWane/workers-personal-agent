@@ -12,6 +12,7 @@ from lib.corpus import CORPUS, Chunk, EmbeddingsIndex, corpus_text_hash
 from lib.jsonl import read_json_lines
 from lib.metrics import mean, ndcg_at_k, paired_bootstrap, recall_at_k, reciprocal_rank
 from lib.paths import DATA, RESULTS
+from lib.snowball import tokenize_snowball
 from lib.stem import tokenize_stemmed
 from lib.vectors import unpack_vectors
 from retrievers.bm25 import BM25Retriever
@@ -152,6 +153,7 @@ def load_retrievers(chunks: list[Chunk], labels: list[Labelled]) -> list[Retriev
         KeywordRetriever(chunks),
         BM25Retriever(chunks),
         BM25Retriever(chunks, name='bm25-stem', tokenizer=tokenize_stemmed),
+        BM25Retriever(chunks, name='bm25-snowball', tokenizer=tokenize_snowball),
     ]
     fasttext_path = DATA / 'fasttext-vectors.json'
     if fasttext_path.exists():
@@ -171,7 +173,13 @@ def load_retrievers(chunks: list[Chunk], labels: list[Labelled]) -> list[Retriev
     return retrievers
 
 
-COMPARISONS = (('bm25', 'keyword'), ('bm25-stem', 'bm25'), ('fasttext', 'bm25-stem'), ('bge-m3', 'fasttext'))
+COMPARISONS = (
+    ('bm25', 'keyword'),
+    ('bm25-stem', 'bm25'),
+    ('bm25-snowball', 'bm25-stem'),
+    ('fasttext', 'bm25-stem'),
+    ('bge-m3', 'fasttext'),
+)
 
 
 def main(out: Path) -> None:

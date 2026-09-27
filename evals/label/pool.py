@@ -7,6 +7,7 @@ from lib.corpus import CORPUS, Chunk, EmbeddingsIndex
 from lib.jsonl import append_json_line, read_json_lines
 from lib.paths import DATA
 from lib.pool import build_pool, key, shuffle_within_query
+from lib.snowball import tokenize_snowball
 from lib.stem import tokenize_stemmed
 from lib.vectors import unpack_vectors
 from retrievers.bm25 import BM25Retriever
@@ -44,7 +45,8 @@ def main(kind: Kind, depth: int) -> None:
 
     dense = DenseRetriever(meta['ids'], vectors, lambda q: qv[q])
     lexical = BM25Retriever(chunks, name='bm25-stem', tokenizer=tokenize_stemmed)
-    retrievers: list[Retriever] = [KeywordRetriever(chunks), BM25Retriever(chunks), lexical, dense]
+    snowball = BM25Retriever(chunks, name='bm25-snowball', tokenizer=tokenize_snowball)
+    retrievers: list[Retriever] = [KeywordRetriever(chunks), BM25Retriever(chunks), lexical, snowball, dense]
     for weight in (1, 2, 4):
         retrievers.append(
             RrfRetriever([Weighted(dense, weight), Weighted(lexical, 1)], depth=20, name=f'rrf-{weight}:1')
