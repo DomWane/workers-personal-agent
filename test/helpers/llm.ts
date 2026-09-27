@@ -9,9 +9,10 @@ export interface Completion {
   message: CompletionMessage
   usage?: Record<string, unknown>
   extra?: Record<string, unknown>
+  finishReason?: string
 }
 
-export function sseCompletion({ message, usage, extra }: Completion): string {
+export function sseCompletion({ message, usage, extra, finishReason }: Completion): string {
   const chunk = (choices: unknown[], more: Record<string, unknown> = {}) =>
     `data: ${JSON.stringify({ id: 'chunk', object: 'chat.completion.chunk', model: 'stub', ...extra, ...more, choices })}\n\n`
   const delta = (d: Record<string, unknown>, finish_reason: string | null = null) =>
@@ -22,7 +23,7 @@ export function sseCompletion({ message, usage, extra }: Completion): string {
     delta({ role: 'assistant', content: '' }),
     ...words.map((w) => delta({ content: w })),
     ...(calls.length ? [delta({ tool_calls: calls.map((c, index) => ({ index, ...c })) })] : []),
-    delta({}, calls.length ? 'tool_calls' : 'stop'),
+    delta({}, finishReason ?? (calls.length ? 'tool_calls' : 'stop')),
     ...(usage ? [chunk([], { usage })] : []),
     'data: [DONE]\n\n',
   ].join('')
@@ -41,7 +42,7 @@ export function completionReply(completion: Completion, capture?: (body: Record<
       : {
           statusCode: 200,
           data: JSON.stringify({
-            choices: [{ message: completion.message }],
+            choices: [{ message: completion.message, finish_reason: completion.finishReason }],
             usage: completion.usage,
             ...completion.extra,
           }),

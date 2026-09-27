@@ -16,7 +16,7 @@ function buildBody(
   opts: ChatOptions,
   extra?: Record<string, unknown>,
 ): Record<string, unknown> {
-  const { maxTokens = 4096 } = opts
+  const { maxTokens = 16_384 } = opts
   return {
     model,
     messages,

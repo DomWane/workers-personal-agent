@@ -38,6 +38,11 @@ function safeText(content: string): string {
   return trimmed
 }
 
+function replyText(r: CompletionResult): string {
+  const text = safeText(r.content)
+  return r.finishReason === 'length' ? `${text}\n\n*(cut off at the output limit)*` : text
+}
+
 function logCompletion(
   log: TurnLog,
   stage: string,
@@ -258,7 +263,7 @@ export async function runToolLoop(input: ToolLoopInput): Promise<LoopResult> {
           toolsUsed,
         })
         return {
-          text: safeText(content),
+          text: replyText(result),
           toolsUsed,
           stopReason: 'complete',
           roundsUsed,
@@ -380,7 +385,7 @@ export async function runToolLoop(input: ToolLoopInput): Promise<LoopResult> {
     toolsUsed,
   })
   return {
-    text: safeText(final.content),
+    text: replyText(final),
     toolsUsed,
     stopReason: reason,
     roundsUsed,

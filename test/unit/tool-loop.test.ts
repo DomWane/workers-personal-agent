@@ -69,6 +69,21 @@ describe('runToolLoop', () => {
     })
   })
 
+  it.each([
+    ['streamed', { onText: () => {} }],
+    ['not streamed', {}],
+  ])('says so when the answer was cut off at the output limit (%s)', async (_, overrides) => {
+    fetchMock
+      .get(BASE)
+      .intercept({ method: 'POST', path: '/v1/chat/completions' })
+      .reply(completionReply({ message: { content: 'half an ans' }, finishReason: 'length' }))
+
+    await expect(loop([echoTool], overrides)).resolves.toMatchObject({
+      text: 'half an ans\n\n*(cut off at the output limit)*',
+      stopReason: 'complete',
+    })
+  })
+
   it('executes a tool call, feeds the result back, returns the final answer', async () => {
     let second: Record<string, unknown> | undefined
     queueResponse({
