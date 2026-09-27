@@ -2,6 +2,7 @@ import { env, fetchMock } from 'cloudflare:test'
 import { getAgentByName } from 'agents'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { mcpRegistry } from '@/agent/mcp/registry'
+import { renderContent } from '@/agent/mcp/client'
 import type { McpClientConfig, McpClientRpc } from '@/agent/mcp/client'
 import { buildMcpTools } from '@/agent/mcp/tools'
 import type { Env } from '@/types'
@@ -167,5 +168,31 @@ describe('an MCP client', () => {
 
     const out = await tools[0].handler({ text: 'hi' } as never, {} as never)
     expect(out).toBe('mock:echo:{"text":"hi"}')
+  })
+})
+
+describe('a tool result shown to the model', () => {
+  it('carries the text of an embedded resource, which is where a file read puts the file', () => {
+    const content = [
+      { type: 'text', text: 'successfully downloaded text file' },
+      {
+        type: 'resource',
+        resource: { uri: 'repo://o/r/contents/README.md', mimeType: 'text/markdown', text: '# Readme' },
+      },
+    ]
+
+    expect(renderContent(content)).toBe('successfully downloaded text file\n# Readme')
+  })
+
+  it('names a resource link and marks what it cannot carry as omitted', () => {
+    const content = [
+      { type: 'resource_link', name: 'README.md', uri: 'repo://o/r/contents/README.md' },
+      { type: 'resource', resource: { uri: 'repo://o/r/logo.png', mimeType: 'image/png', blob: 'iVBOR' } },
+      { type: 'image', mimeType: 'image/png', data: 'iVBOR' },
+    ]
+
+    expect(renderContent(content)).toBe(
+      '[resource README.md at repo://o/r/contents/README.md]\n[resource content omitted]\n[image content omitted]',
+    )
   })
 })

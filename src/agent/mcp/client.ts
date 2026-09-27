@@ -28,17 +28,29 @@ const AUTH_RESULT_HTML = (heading: string, note: string) => {
   )
 }
 
-function renderContent(content: unknown): string {
-  if (!Array.isArray(content)) {
-    return ''
+interface ContentBlock {
+  type: string
+  text?: string
+  name?: string
+  uri?: string
+  resource?: { text?: string }
+}
+
+function renderBlock(block: ContentBlock): string {
+  if (block.type === 'text' && block.text !== undefined) {
+    return block.text
   }
-  return (content as { type?: string; text?: string }[])
-    .map((block) =>
-      block?.type === 'text' && typeof block.text === 'string'
-        ? block.text
-        : `[${block?.type ?? 'unknown'} content omitted]`,
-    )
-    .join('\n')
+  if (block.type === 'resource' && block.resource?.text !== undefined) {
+    return block.resource.text
+  }
+  if (block.type === 'resource_link') {
+    return `[resource ${block.name} at ${block.uri}]`
+  }
+  return `[${block.type} content omitted]`
+}
+
+export function renderContent(content: unknown): string {
+  return Array.isArray(content) ? (content as ContentBlock[]).map(renderBlock).join('\n') : ''
 }
 
 function failure(err: unknown): { ok: false; error: string } {
