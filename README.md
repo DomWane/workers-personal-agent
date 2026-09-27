@@ -4,8 +4,7 @@
 
 A personal AI agent that runs entirely on Cloudflare's free tier. One Durable Object per
 conversation, long-term memory as markdown in R2, semantic recall from an embedding index in
-Durable Object SQLite, and a deep-research mode that fans out across child Durable Objects. Every
-platform limit it runs into is measured and written down.
+Durable Object SQLite, and a deep-research mode that fans out across child Durable Objects.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/DomWane/workers-personal-agent)
 
@@ -159,9 +158,8 @@ Set in `wrangler.jsonc`.
 | Workers AI                      | 10,000 neurons a day             | a deep research run on the default model | the provider answers 429 and the turn is reported as failed |
 | Search without a key            | Tavily unpublished · Firecrawl 1,000 credits a month | a research run with no search secret | a refused search is a tool fault, never an empty web |
 
-A chat turn never meets any of these. Deep research meets the first three on every run and is built
-to finish anyway: on the run in [the walkthrough](docs/manual-e2e.md) it lost 14 of 30 page reads to
-the Browser Rendering limit, completed, and said so. The full table, with how each number was
+On the run in [the walkthrough](docs/manual-e2e.md) deep research lost 14 of 30 page reads to the
+Browser Rendering limit, completed, and said so. The full table, with how each number was
 measured, is in [ARCHITECTURE.md](ARCHITECTURE.md#platform-limits-and-which-of-them-were-measured).
 
 ## 🛠 Development
@@ -218,7 +216,7 @@ docs/                      decisions, measurements, the manual walkthrough
   [0.070, 0.326]**.
 - **[Does ThinkingCap's token saving hold in Czech, over real work?](docs/thinkingcap-replication.md):**
   an independent replication off the benchmark the claim was made on. The saving holds at
-  **50.8% [43.2%, 57.7%]**; the capability half is underpowered, and the write-up says so.
+  **50.8% [43.2%, 57.7%]**; the capability half is underpowered.
 - **[The walkthrough for the seams no suite covers](docs/manual-e2e.md):** the DOM, and the socket
   between the built client and a live Worker. It opens with the three bugs found by hand that no
   unit test could have failed.

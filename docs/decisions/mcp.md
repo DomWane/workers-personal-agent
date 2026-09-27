@@ -1,7 +1,6 @@
 # MCP servers
 
-The client is the Agents SDK's `this.mcp` (`agents@0.16.2`). This repo decides where it lives, how
-its tools reach the loop, and what bounds it.
+The client is the Agents SDK's `this.mcp` (`agents@0.16.2`).
 
 ## One Durable Object per server, a registry for the catalog
 

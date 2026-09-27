@@ -28,15 +28,14 @@ remains the only thing finding unused code in `web/`. `noUnusedLocals` is on for
 
 ## Type-aware rules run on TypeScript 5.9
 
-`oxlint-tsgolint` produced byte-identical findings under 5.9 and 7.0 in a throwaway worktree. The
+`oxlint-tsgolint` produced byte-identical findings under 5.9 and 7.0. The
 upgrade is blocked on the Vue side: `vue-tsc` loads `typescript/lib/tsc`, which 7.0 no longer
 exports, and `vite build web` fails with 61 `@vue/compiler-sfc` errors. `tsc --noEmit` over `src/`,
 `test/` and `evals/` passes on 7.0.
 
 `options.typeAware` in `.oxlintrc.json` means `pnpm lint` runs them with no flag, in 0.6 s. The
 reference set is typescript-eslint's `strict-type-checked`: 68 rules, 48 report zero here and all 48
-are on, including `no-floating-promises`, which found nothing because the `void` discipline was
-already there.
+are on, including `no-floating-promises`.
 
 **Refused, with counts:** `no-unnecessary-condition` 41, `require-await` 82,
 `no-confusing-void-expression` 66, `no-non-null-assertion` 42, `no-unnecessary-type-assertion` 41,

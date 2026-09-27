@@ -18,7 +18,7 @@ reflection archives and merges skills from another Durable Object, and a thread 
 would keep offering a slug that `read_skill` no longer finds. Reading it each turn costs one R2
 `list`: every skill write stores its frontmatter as the object's custom metadata, and `list` returns
 that without a `get` per file. A skill file dropped into the vault by hand carries no metadata and
-is opened the old way, so it still shows up. A description is capped at 120 characters on save and
+is read with a `get`, so it still shows up. A description is capped at 120 characters on save and
 `listSkills` already stops at 30 files, so the block is bounded at a few kilobytes.
 
 ## Use is what keeps a skill alive

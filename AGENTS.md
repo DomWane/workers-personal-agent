@@ -9,9 +9,6 @@ measured, every ceiling this agent runs into and whether it fails loudly, the in
 outages when broken, the vault layout, and what a deploy cannot provision. Read it before changing
 anything under `src/`. The reasoning per subsystem is in `docs/decisions/`, indexed there.
 
-This file is the working part: commands, how the tests are shaped, what must stay out of the
-repository, and how to work here.
-
 ## Commands
 
 ```bash
@@ -34,7 +31,7 @@ build, so `pnpm dev` and `pnpm run deploy` both produce it; run it by hand only 
 the deployed Worker, which Access gates. `brew install cloudflared` once, and then wrangler sends
 you to the Access login.
 
-The second half is the one that costs an hour: **it must be interactive.** Piping dev through `tee`
+**It must be interactive.** Piping dev through `tee`
 is enough to make it non-interactive, and it then fails with *"no Access Service Token credentials
 were found and the current environment is non-interactive"*, which reads as a credentials problem
 and is a TTY problem. `script -q /tmp/dev.log pnpm dev` keeps both. For a genuinely non-interactive
@@ -42,12 +39,12 @@ run, an Access **service token** in `CLOUDFLARE_ACCESS_CLIENT_ID` / `CLOUDFLARE_
 is the supported path.
 
 `pnpm test` and `uv run pytest` (in `evals/`) are **two different suites and neither runs the
-other's tests**. Running only one and declaring the suite green is a mistake that has happened.
+other's tests**. Running only one does not make the suite green.
 
 **Lint and format decisions live in [docs/decisions/linting-and-formatting.md](docs/decisions/linting-and-formatting.md)**:
 which rules are on, which were counted and refused, and why type-aware linting does *not* need the
-TypeScript 7 upgrade that would break `vue-tsc`. One thing to know without reading it: `pnpm lint`
-runs type-aware rules with no extra flag.
+TypeScript 7 upgrade that would break `vue-tsc`. `pnpm lint` runs type-aware rules with no extra
+flag.
 
 `evals/` is a Python project and none of the pnpm commands touch it. From that directory: `uv sync`,
 then `uv run pytest`, `uv run ruff check`, `uv run ruff format`, `uv run pyright`; the scripts are
@@ -74,25 +71,23 @@ binding through [test/helpers/vault.ts](test/helpers/vault.ts) and assert on wha
 holds. A file that is simply absent is the not-found case and needs no setup at all.
 
 Bindings are pinned in `vitest.config.ts` (`LLM_BASE_URL`, `LOG_CONTENT: ''`) so the suite never
-depends on the real values in `wrangler.jsonc`. `LOG_CONTENT` is the one this caught: the
-deployment opts in, and an inherited binding made a test assert content logging was off while it
-was on.
+depends on the real values in `wrangler.jsonc`. `LOG_CONTENT` is why: the deployment opts in, so an
+inherited binding turns content logging on under a test that asserts it is off.
 
-Two more, both found the hard way:
+Three more:
 
 - **`SELF.fetch` cannot see a mutated `env`.** The pool hands the test a copy, so a test that needs
   a different binding (the Cloudflare provider branch, where `LLM_BASE_URL` is *absent* while the
   suite pins it) must call `worker.fetch(request, {...env, LLM_BASE_URL: undefined}, ctx)` directly.
-- **The Cache API outlives a test's mocks.** `/api/models` cached in it once, and one test's
-  payload answered the next test's request; it no longer caches at all, because an hour of cache
-  also outlived a change of `LLM_BASE_URL` and read as the switch not working. Varying the URL
-  per test was rejected: test scaffolding does not belong in a URL contract.
-- **A fake standing in for the seam under test empties the test silently.** Every scout test handed
-  the loop a `Map` for its archive, so when the scout gained a real one on 2026-09-02 the code that
-  builds it, `sqlTag(this.ctx.storage.sql)` inside a class declared under `new_sqlite_classes`,
-  had never executed anywhere, and its failure mode is quiet (`archive-failed`, findings still
-  returned, the pruner mute for the run). `runInDurableObject` on the real namespace is what covers
-  it. Note that a Durable Object doing I/O in `blockConcurrencyWhile` (the subrequest-plan lookup)
+- **The Cache API outlives a test's mocks**: one test's payload answers the next test's request.
+  `/api/models` does not cache, because a cached catalogue also outlives a change of
+  `LLM_BASE_URL`. Varying the URL per test was rejected: test scaffolding does not belong in a URL
+  contract.
+- **A fake standing in for the seam under test empties the test silently.** A scout test that hands
+  the loop a `Map` for its archive never executes the code that builds the real one,
+  `sqlTag(this.ctx.storage.sql)` inside a class declared under `new_sqlite_classes`, and its failure
+  mode is quiet (`archive-failed`, findings still returned, the pruner mute for the run).
+  `runInDurableObject` on the real namespace is what covers it. Note that a Durable Object doing I/O in `blockConcurrencyWhile` (the subrequest-plan lookup)
   throws under `disableNetConnect`, is caught, and logs `assumed: 50`; that is the expected shape,
   not a broken test.
 
@@ -102,7 +97,7 @@ would take the history with it, and half those tests assert on what a run did as
 said.
 
 **Every new guard gets a mutation check**: the test names what to break in the code and fails when
-it is broken. A guard only guards if the regression actually fails it.
+it is broken.
 
 ## Evals
 
@@ -123,27 +118,23 @@ repository, and `Chunk` lives in `evals/lib/corpus.py` so the tracked half stand
 the screenshot, and `docs/decisions/`. Working material (plans, notes, anything not for a reader)
 goes under `internal/`, which is gitignored as a whole; a note that lands in `docs/` is published.
 
-**`docs/decisions/` is where the architecture's reasoning went when it outgrew one document**:
+**`docs/decisions/` holds the architecture's reasoning**:
 every pointer in `ARCHITECTURE.md` lands there, so it is committed as a whole.
 
 The two write-ups share a house style: a claim or question as the title, numbered sections, and a
-section listing what was measured wrong before it was measured right; that section is the point,
-not an appendix.
+section listing what was measured wrong before it was measured right.
 
-`docs/manual-e2e.md` is a different genre and is committed for a different reason: it is the
-walkthrough for the seams no suite covers (the DOM, and the socket between the built client and a
+`docs/manual-e2e.md` is the walkthrough for the seams no suite covers (the DOM, and the socket between the built client and a
 live Worker), and without it the `scripts/stub-llm.mjs` and `--scenario` machinery beside it would
 be committed with nothing saying what they are for. It opens with the three bugs found by hand that
-no unit test could have failed, because that is its argument for existing.
+no unit test could have failed.
 
 ## Style
 
-Behaviour goes in a test with a descriptive name, ameasurement in `ARCHITECTURE.md`, 
+Behaviour goes in a test with a descriptive name, a measurement in `ARCHITECTURE.md`,
 a rejected alternative in `docs/decisions/`.
 
 ## Working with me here
-
-Each of these is here because it was violated on 2026-08-03/04, not because it sounds good.
 
 - **Non-obvious decisions name the rejected alternative and why.** Not a menu of options with an
   obvious winner: the one that was seriously in play and lost, and what it lost on.

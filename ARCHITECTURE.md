@@ -41,9 +41,8 @@ point into a deleted thread and must resolve to "source deleted" rather than to 
 The cron and the chat share the Worker and nothing else, which is the invariant below drawn as two
 disjoint sets of arrows: **maintenance never runs inside a turn.**
 
-**The web is the only channel.** It started on Telegram, which was removed on 2026-08-21 once
-Cloudflare Access became the gate: Access binds to the Worker and authenticates every path, and a
-webhook cannot sign in. The client is a Vue app in `web/`, built into `./public` and served by the
+**The web is the only channel.** Cloudflare Access is the gate: it binds to the Worker and
+authenticates every path, and a webhook cannot sign in. The client is a Vue app in `web/`, built into `./public` and served by the
 Worker's asset binding; it talks to the DO over the Agents SDK WebSocket. Its whole delivery
 mechanism is `setState`: the SDK persists *and* broadcasts to every connected client, so the thread,
 the research status card and the finished report need no sending code at all. A running turn rides
@@ -52,9 +51,8 @@ the text of the round being generated (streamed from the provider, broadcast at 
 `DRAFT_BROADCAST_MS = 250`), and the `setState` that writes the finished turn into `messages`
 clears both.
 
-Runtime deps of the Worker are `agents`, `openai` and `zod`. The bundle cap that used to be the
-argument against a third one was misread: **the 3 MB Free-plan limit is on the gzipped upload**, not
-on the number `wrangler` prints first. Measured 2026-08-20 at `Total Upload: 2262.73 KiB / gzip:
+Runtime deps of the Worker are `agents`, `openai` and `zod`. **The 3 MB Free-plan bundle limit is on
+the gzipped upload**, not on the number `wrangler` prints first. Measured 2026-08-20 at `Total Upload: 2262.73 KiB / gzip:
 412.18 KiB`, so 13% of the cap is used, not 74%. `zod` cost **nothing measurable**: gzip went from
 412.34 to 412.18 KiB, because the hand-written JSON Schema literals it replaced were bulk of their
 own. Size is therefore not the reason to refuse a dependency here; needing it is. Everything the
@@ -112,10 +110,9 @@ So fan-out multiplies the external budget: N children is N × 50 external reques
 pays N against a separate 1,000. Alarms on a single DO serialise and a second agent inside one
 invocation would overflow, so this is the only parallelism available on this plan. The Agents SDK
 already exposes sub-agent facets (`/sub/{child-class}/{child-name}`, `onBeforeSubAgent`), so nothing
-blocks it now; the probe was the blocker.
+blocks it.
 
-**The 10 ms CPU ceiling is a Worker ceiling, not a Durable Object one**, which this repo had
-recorded as one number for both. Measured the same day: the plain `fetch` handler dies at
+**The 10 ms CPU ceiling is a Worker ceiling, not a Durable Object one.** Measured the same day: the plain `fetch` handler dies at
 `cpuTimeMs: 13` (`units=1` of the probe's spin loop passes and `units=5` does not), while a
 Durable Object ran 1,323 ms of the same loop without complaint and only died at `cpuTimeMs: 32000`.
 Three thousand times the room, and every line of this agent's work runs on the second number. So
@@ -131,23 +128,21 @@ paragraph below shows a Workers Free column. Untested, not needed yet.
 **A `pnpm run deploy` does not mean the next request runs the new code.** A live Durable Object keeps
 running its old version until the instance restarts. On 2026-08-06 a fix was deployed, the next
 invocation 22 seconds later still ran the old code, and the new one took effect about five minutes
-later once the DO had gone idle. Half an hour went into looking for a bug in code that was
-correct and simply not running yet. When a deploy appears to have had no effect, wait for a
+later once the DO had gone idle. When a deploy appears to have had no effect, wait for a
 restart before doubting the change. *(Consistent with every number observed that day; the DO
 lifecycle docs were not read.)*
 
 ## Where this agent runs out of room
 
-Current sizes as of 2026-08-12: 47 indexable files, 93 chunks, the later measurement, because the
-2026-08-06 one predates chunking and counted a file as one vector. Nothing below is
-close except where marked. The column that matters is the last one: a ceiling that degrades
+Current sizes as of 2026-08-12: 47 indexable files, 93 chunks. Nothing below is close except where
+marked. The column that matters is the last one: a ceiling that degrades
 loudly is a scheduling problem, one that degrades silently is a correctness problem you will not
 notice.
 
 | Ceiling | Value | Bites at | What happens |
 | :--- | :--- | :--- | :--- |
 | Reindex per invocation | the subrequest budget, checked against the next file's chunk count | a night whose changed files exceed ~46 chunks | the cron runs up to `MAX_REINDEX_SLICES = 10` slices back-to-back, then logs `stage: 'slices-exhausted'` |
-| `search()` brute-force cosine | 30 s CPU, 1024 dims/vector | far further out than the 1 to 5k vectors this row used to claim | recall throws or truncates |
+| `search()` brute-force cosine | 30 s CPU, 1024 dims/vector | far further out than 1 to 5k vectors | recall throws or truncates |
 | Reindex CPU per slice | same 30 s | not the binding constraint; embeddings are | nothing |
 | Scheduled tasks | `MAX_SCHEDULED_TASKS = 20`, and a recurring task hourly at most | a model that reads a page telling it to poll every minute | `set_scheduled_task` answers with an error naming the limit; reminders are exempt, they send one message |
 | `listSkills` | `MAX_SKILLS = 30` | 31 skills | loud since 2026-08-06: `stage: 'skills-truncated'` || `read_page` fallback | Firecrawl when Browser Rendering refuses | every blocked page | loud: `at: 'read_page'`, `via`, `fellBack`, `why` |
@@ -161,14 +156,14 @@ notice.
 | The verbatim tail cutting a tool group | none; `ownedGroupStart` moves the boundary back to the assistant that owns the calls, even where that overshoots `0.25 × context` | a compaction landing mid-round | **silent**, and deliberately: the alternative is an unmatched `tool_call_id`, which the next request refuses with a 400 |
 | Tool traffic whose other half is missing | none; dropped from the copy sent to the model | a turn interrupted between a call and its result | loud: `stage: 'unpaired-tool-traffic'` over stored state, `stage: 'unpaired-write'` when the loop's own output is the unbalanced one |
 | Model catalogue | none; fetched on every page load, `cache-control: no-store` | nothing | one upstream request per load. Was cached for an hour, and the hour outlived a change of `LLM_BASE_URL`: the picker kept the old provider's list and the switch read as broken |
-| Tool rounds per turn | `maxRounds = 12`, a backstop raised from 6 on 2026-08-27 | complex asks | loud: `stopReason: 'max-rounds'`, and now rare enough that the reason is worth reading |
+| Tool rounds per turn | `maxRounds = 12`, a backstop raised from 6 on 2026-08-27 | complex asks | loud: `stopReason: 'max-rounds'` |
 | Tokens per turn | `maxRounds × context` by construction: a request over the window is refused, so a round cannot exceed it | never observed | measured, not guarded: `tokensSpent` on every `stage: 'done'`. A tighter budget was written and removed the same day; it halved a ceiling that already existed, on a number nothing had measured |
 | Output tokens per call | `max_tokens = 16384`, reasoning included (measured 2026-09-27, `deepseek/deepseek-v4.1-flash`) | a long answer after long reasoning | loud: the reply ends with "*(cut off at the output limit)*", the round logs `finishReason: 'length'` |
-| A provider that reports no `usage` | none; `tokensSpent` reads 0 | a provider omitting the block | loud: `stage: 'unmetered'`, once per turn, so blindness cannot pass for thrift |
+| A provider that reports no `usage` | none; `tokensSpent` reads 0 | a provider omitting the block | loud: `stage: 'unmetered'`, once per turn, so a 0 is not read as a cheap turn |
 | A tool result kept whole | `ARCHIVE_MIN_CHARS = 2000` and up | every page and search | `archive` row per result, read back with `read_tool_result`; a failed write is loud (`stage: 'archive-failed'`) and costs only the ref. **A handler that cuts its own output cuts the row too**: `search_memory` did, and filed 4,041 of 12,213 characters while offering a ref to the rest. Cutting belongs to the loop |
-| How long a tool result stays whole | `PROTECT_RECENT_RESULTS = 1`, and the prune runs after a round completes, so the first cut is round `N + 3` | a turn of four rounds or more; 13 of 16 real turns had fewer | not a truncation at all, which is the point: at `N = 3` it fired in 1 turn of 16. `stage: 'pruned'` is absent when nothing was old enough |
+| How long a tool result stays whole | `PROTECT_RECENT_RESULTS = 1`, and the prune runs after a round completes, so the first cut is round `N + 3` | a turn of four rounds or more; 13 of 16 real turns had fewer | not a truncation at all: at `N = 3` it fired in 1 turn of 16. `stage: 'pruned'` is absent when nothing was old enough |
 | A tool result the model already answered | `PRUNE_OVER_CHARS = 8192`, kept as 4096 + 1024 | a `read_page` in any round but the last | loud: `stage: 'pruned'` carries the characters saved. Only tools that raised `maxResultChars` reach it (`truncate`'s 4000 cuts the rest below the threshold first), and only a result carrying a ref, since the archive is what makes the cut recoverable. `search_memory` joined that set on 2026-09-02 at 20,000 |
-| **The pruner against a small window** | `resultCap` falling under `PRUNE_OVER_CHARS`, any window below ~27,300 tokens | a scout on the picker's low end | loud since 2026-09-02: `stage: 'prune-inert'`. **The two caps cancel each other**: the smaller the window, the harder `resultCap` bites, and the more certainly every result lands under the 8,192 the pruner acts above. At 24k every result is 7,200 characters and nothing is ever shortened, so that model has protection against *one* result and none against the *sum*, which is the state a scout was in before it had an archive at all. Pinned by a test rather than fixed: tuning the two against each other buys a round or two before the sum overflows anyway, and research on a 24k model is not a thing anyone runs |
+| **The pruner against a small window** | `resultCap` falling under `PRUNE_OVER_CHARS`, any window below ~27,300 tokens | a scout on the picker's low end | loud since 2026-09-02: `stage: 'prune-inert'`. **The two caps cancel each other**: the smaller the window, the harder `resultCap` bites, and the more certainly every result lands under the 8,192 the pruner acts above. At 24k every result is 7,200 characters and nothing is ever shortened, so that model has protection against *one* result and none against the *sum*. Pinned by a test rather than fixed: tuning the two against each other buys a round or two before the sum overflows anyway, and research on a 24k model is not a thing anyone runs |
 | A tool result in `state.messages` | the same 8192, as a hard `truncate` | a result whose filing threw | **silent**, and the loss is already reported by `archive-failed`: with no ref there is nothing to recover, so the choice is only whether the middle is also broadcast to every client on every later turn |
 | `search_tool_results` matches | `MAX_HITS = 5` | a common word in a long thread | **silent**, and a `LIMIT` on the read rather than on the reply: each row carries a whole page, so the cap exists to avoid parsing fifty of them to cut fifty snippets. Doing the slice in SQL would retire it |
 | The plan lookup itself | one `fetch` per instance per hour, uncounted | every cold start | the one outbound call `SubrequestBudget` does not see; it runs before any budget exists, which is what it is for. It spends one of that invocation's 50. **Never awaited**: a start fires it and holds the free-plan floor until it answers, so a paid deployment is capped at 50 until then. Invisible unless a turn inside that window wants more than 50, and then it is the ordinary exhaustion path: loud, as `stopReason: 'subrequest-budget'` |
@@ -198,23 +193,22 @@ notice.
 | `read_research_report` result | 40,000 chars | a report over ~40k | `truncate` names the cut in the model's copy and logs nothing; the whole thing is in the archive |
 | A `web_search` result | `MAX_SEARCH_CHARS = 10000` over `SEARCH_RESULTS = 10`, against a measured 4748 to 5979 and a structural ~6700 | never | all three numbers set 2026-09-01, all measured. Asking five rendered 2542 to 3016 and needed no cap; asking ten crosses the loop's default 4000 every time, so a cap must be declared and must sit above the *ceiling* rather than the sample: 6000 cleared six of six queries and would still have cut the first long one. An inherited `2000` sat under the distribution and cut **8 of 8** searches silently. Asking twenty returns 8 to 19 results and up to 10402 chars, which a round that opens one or two pages cannot use. `deepseek-harness` bounds the same tool at 8 results and sets no character cap |
 | A search snippet | 500 chars, one of the three chunks Tavily joins | a long snippet | **silent**, and much smaller than it was: 400 cut *inside* the first chunk and kept 11,743 of 35,243 characters already paid for; 29 of 30 results measured were over it |
-| **Any one tool result against the window** | `RESULT_SHARE_OF_WINDOW = 0.10` of the model's context, in estimated chars: 7,200 at 24k, 393,000 at 1.31M | the picker's low end, never the default model | loud: `stage: 'window-capped'`. The fraction binds below ~333k tokens (where 0.10 × 3 chars × window drops under `MAX_PAGE_CHARS`) and each tool's own cap binds above, which is the crossover one absolute number cannot have. **An unknown window is treated as unknown, not as small**, the opposite of `DEFAULT_CONTEXT_TOKENS` elsewhere, because a thread's window is simply unresolved until something asks, and guessing 24k would cut nine tenths off every first page read on the default model. It matters most in a **scout**, which has no overflow retry, so a request over the window loses the angle as `scout-failed` rather than being compacted and sent again. **Two comparable harnesses scale this with the window.** `openclaw` derives its live tool-result cap from the effective window in bands: 16,000 chars below 100k tokens, 32,000 at 100k+, 64,000 at 200k+ (read from `docs.openclaw.ai/gateway/config-agents` on 2026-09-02), which is 5 to 11% of the window at this repo's own 3-chars-per-token estimate, so `0.10` lands inside their top band. `gemini-cli` bounds tool output a third way: `COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET`, one shared 50,000-token budget across all of them, walked newest-first, so a big result costs its neighbours rather than being capped alone; its `contextPercentageThreshold` default reads `0.7` in the published config docs and `0.5` in DeepWiki's account of the constants, and that conflict is unresolved. `hermes-lcm` and `deepseek-harness` do keep absolute per-result thresholds. So a fraction is an ordinary answer here, not a novel one. It is still a **patch for having a 100,000-char first view**, and **the only cap acting before the first send**: a ref, the pruner and `read_tool_result` all act from round `N + 1` and only on re-sends, so the round that *first* carries the page carries it whole, and in a scout that request is `scout-failed` rather than retried. The scout's archive fixed recoverability of a cut, not overflow. Arm B, a small first view plus a ref, is what could retire this |
+| **Any one tool result against the window** | `RESULT_SHARE_OF_WINDOW = 0.10` of the model's context, in estimated chars: 7,200 at 24k, 393,000 at 1.31M | the picker's low end, never the default model | loud: `stage: 'window-capped'`. The fraction binds below ~333k tokens (where 0.10 × 3 chars × window drops under `MAX_PAGE_CHARS`) and each tool's own cap binds above, which is the crossover one absolute number cannot have. **An unknown window is treated as unknown, not as small**, the opposite of `DEFAULT_CONTEXT_TOKENS` elsewhere, because a thread's window is simply unresolved until something asks, and guessing 24k would cut nine tenths off every first page read on the default model. It matters most in a **scout**, which has no overflow retry, so a request over the window loses the angle as `scout-failed` rather than being compacted and sent again. **Two comparable harnesses scale this with the window.** `openclaw` derives its live tool-result cap from the effective window in bands: 16,000 chars below 100k tokens, 32,000 at 100k+, 64,000 at 200k+ (read from `docs.openclaw.ai/gateway/config-agents` on 2026-09-02), which is 5 to 11% of the window at this repo's own 3-chars-per-token estimate, so `0.10` lands inside their top band. `gemini-cli` bounds tool output a third way: `COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET`, one shared 50,000-token budget across all of them, walked newest-first, so a big result costs its neighbours rather than being capped alone; its `contextPercentageThreshold` default reads `0.7` in the published config docs and `0.5` in DeepWiki's account of the constants, and that conflict is unresolved. `hermes-lcm` and `deepseek-harness` do keep absolute per-result thresholds. The fraction is a **patch for having a 100,000-char first view**, and **the only cap acting before the first send**: a ref, the pruner and `read_tool_result` all act from round `N + 1` and only on re-sends, so the round that *first* carries the page carries it whole, and in a scout that request is `scout-failed` rather than retried. The scout's archive fixed recoverability of a cut, not overflow. Arm B, a small first view plus a ref, is what could retire this |
 | A `search_memory` result | `20000`, set 2026-09-02 | never, by construction | one memory may be `MAX_CONTENT_CHARS` alone and a result carries three plus sessions, so the default cut it to a third every time: **12,213 characters measured against a 4,000 cap**. It was the only one of nineteen tools overflowing the default systematically; the other eighteen are nowhere near it, which is why this is its own cap rather than a bigger default |
-| Any other tool result | `truncate`'s default 4000 | tools that return volume | same: head and tail survive, the marker counts what went, and `read_tool_result` has the rest. **The recovery is an invariant, not a coincidence**: `ARCHIVE_MIN_CHARS = 2000` sits under the smallest cap anything is cut at, so a cut result is always filed and its marker always redeemable. `test/unit/tools.test.ts` holds that across the two files it spans, and it holds in a scout too |
+| Any other tool result | `truncate`'s default 4000 | tools that return volume | same: head and tail survive, the marker counts what went, and `read_tool_result` has the rest. **The recovery is an invariant**: `ARCHIVE_MIN_CHARS = 2000` sits under the smallest cap anything is cut at, so a cut result is always filed and its marker always redeemable. `test/unit/tools.test.ts` holds that across the two files it spans, and it holds in a scout too |
 | Earlier findings shown to a round | `FINDINGS_SHOWN = 3` | run past round 4 | loud: `stage: 'findings-windowed'`; the report still writes from all of them |
 | Visited URLs shown to a round | `VISITED_SHOWN = 30` | 31 pages in one run | loud: `stage: 'visited-truncated'`; `read_page` still refuses the tail |
 | R2 `list` page | 1000 keys | 1000 files in one folder | handled: the connector paginates |
 | DO SQLite | 10 GB | never, at 93 vectors | nothing |
 | Workers Logs | 3 days | every missed export | traces gone for good |
 
-One row left that list rather than getting louder: `MAX_EMBED_CHARS` was a head-truncation that hid
+`MAX_EMBED_CHARS` was a head-truncation that hid
 half the vault's characters from the index (50,802 of 103,783, measured 2026-08-12), and it is now
 the size of a chunk, so a file is covered end to end. Adopted for that coverage, not for ranking:
 `evals/results/chunking-experiment.md` compared chunked against truncated on 78 labels and every
 interval crossed zero.
 
-The silent ones are the list to watch. `MAX_SKILLS = 30` was the nearest and now logs when it
-truncates: the cap did not move, the invisibility did. Sessions accumulate forever with nothing
+The silent ones are the list to watch. Research reports accumulate, one file per run, with nothing
 pruning them, so the manifest and the embedding index grow without bound while the CPU ceiling on
 `search()` stays fixed.
 
@@ -224,8 +218,7 @@ loud first, so the next person finds out from a log line rather than from a wron
 ## Design decisions, by subsystem
 
 The reasoning behind each subsystem (the rejected alternative, the measurement, the outage that
-caused the rule) lives in `docs/decisions/`. Read the one you are about to touch. Nothing there is
-a description of the code; it is what the code cannot tell you.
+caused the rule) lives in `docs/decisions/`. Read the one you are about to touch.
 
 | | |
 | :--- | :--- |
@@ -239,9 +232,7 @@ a description of the code; it is what the code cannot tell you.
 | [providers-and-models.md](docs/decisions/providers-and-models.md) | Why `/api/models` is proxied, and the one Cloudflare token that covers everything. |
 | [linting-and-formatting.md](docs/decisions/linting-and-formatting.md) | Which oxlint rules are on, which were counted and refused, and why TypeScript 7 is blocked. |
 
-Two of these carry a rule worth knowing before you read any of them: **maintenance never runs inside
-a turn**; and **compaction is the only thing that destroys history**, which is why it records what
-it destroys.
+**Compaction is the only thing that destroys history**, which is why it records what it destroys.
 
 ## Invariants that cause outages when broken
 
@@ -260,29 +251,23 @@ is needed and schedule it; it must not perform it. A full index sweep firing ins
 what caused the 2026-08-03 outage. Bounding such work to "what fits in the leftover budget" is a
 smaller version of the same mistake, not a fix.
 
-**Retired 2026-08-22: "failure notices go out on a fresh invocation."** `catch` blocks used to
-schedule `postNotice` rather than call `sendMessage` inline, because sending from an invocation that
-had just exhausted its budget failed for the same reason the turn did and the user saw nothing at
-all. With no outbound send left, a notice is a `setState` and costs no subrequest, so the hop
-reported from one state write instead of another. `catch` blocks call `emit` directly. It is
-recorded rather than deleted because the reasoning is still right: **it comes back the day
-anything here sends again.**
+**Failure notices go out inline.** A notice is a `setState` and costs no subrequest, so `catch`
+blocks call `emit` directly. **The day anything here sends again, notices move back to a fresh
+invocation**: a send from an invocation that has just exhausted its budget fails for the same reason
+the turn did, and the user sees nothing.
 
 **Assets answer before the Worker unless the path is listed.** `run_worker_first` in
 `wrangler.jsonc` names every non-UI prefix (`/agents/*`, `/api/*`, `/admin/*`, `/dev/*`). A path
-missing from that list is served the SPA shell and the handler never runs. It has bitten twice: once
-the Telegram webhook, back when there was one (caught in review), once `/api/models` (caught by a
-curl returning `<!doctype html>`). A new route means a new entry, and the symptom is HTML where JSON
-was expected, not a 404, which is what makes it confusing.
+missing from that list is served the SPA shell and the handler never runs. A new route means a new
+entry, and the symptom is HTML where JSON was expected, not a 404.
 
 **The tool loop keeps a reserve, and checks it per tool call.** `FINAL_ANSWER_RESERVE` calls stay
 unspent so a turn that runs out of room still produces something readable instead of throwing
 inside the OpenAI client. Checking only between rounds is not enough: a model can request many
 tools in one round and each spends, which is how a turn reached 55 of 50 on 2026-08-07. A skipped
 call still gets a tool result, because an unmatched `tool_call` id makes the next request a 400, so
-skipping quietly trades an over-budget turn for a broken one. The reserve is now the only claim on
-that budget: the typing indicator, which used to yield at a higher floor so cosmetics lost before
-answers did, went with the Telegram channel.
+skipping quietly trades an over-budget turn for a broken one. The reserve is the only claim on that
+budget.
 
 **A tool's schema is one object, and the loop validates against it before the handler runs.** A
 handler is never entered with arguments the schema refused, and a refusal goes back to the model as
@@ -294,7 +279,7 @@ JSON Schema instead of deriving it from `params` reintroduces the drift this rem
 
 Vault layout in the R2 bucket bound as `VAULT`, under the `VAULT_AGENT_DIR` key prefix. It began
 as a GitHub repository behind the same four methods, which is why `VaultBackend` is an interface
-with one implementation: the swap was a class, not a rewrite.
+with one implementation.
 
 ```
 agent/MEMORY.md      hand-written index — one "- slug — description" line per memory
@@ -329,9 +314,7 @@ on the way *in* once archived the wrong file.
 
 ## Deploying this
 
-The two things a fresh deploy gets wrong if nobody says them, and both are deliberate.
-
-- **The committed defaults are opinions, not neutral.** `LLM_BASE_URL` is unset, so Workers AI
+- **The committed defaults are deliberate.** `LLM_BASE_URL` is unset, so Workers AI
   answers with `CF_API_TOKEN` alone and `LLM_MODEL` is a `@cf/` id (set the var to any
   OpenAI-compatible endpoint and add `LLM_API_KEY` to leave it), and `LOG_CONTENT` is on, which
   means message bodies, tool arguments and tool results reach the logs. Both are one line in
@@ -351,5 +334,4 @@ The two things a fresh deploy gets wrong if nobody says them, and both are delib
   Worker runs), so in normal operation there is no unprotected door.
 - **`wrangler deploy` cannot provision any of that.** It creates the Durable Objects and binds
   Workers AI, and the bucket is one `r2 bucket create`, but Zero Trust is a separate product with its
-  own activation. So a stranger's first deploy is a Worker that answers 503 until they set Access up,
-  which is the intended shape, and the reason the default is closed rather than open.
+  own activation. So a stranger's first deploy is a Worker that answers 503 until they set Access up.

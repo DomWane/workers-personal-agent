@@ -1,7 +1,6 @@
 # Deep research
 
-Decisions behind the research mode. The current values sit in the limits table in
-[ARCHITECTURE.md](../../ARCHITECTURE.md); this file holds why they are what they are.
+The current values sit in the limits table in [ARCHITECTURE.md](../../ARCHITECTURE.md).
 
 ## A round with several angles is a wave of scout Durable Objects
 
@@ -11,8 +10,8 @@ is a plain round.
 **Why.** Each scout has its own fifty subrequests and thirty seconds of CPU (measured 2026-08-08),
 so breadth costs the parent one internal call per angle.
 **Rejected.** `RESEARCH_MIN_ROUNDS = 6`. Three runs ended after one round on `## Done: yes`; once
-the wave covers every angle the verdict needs no overruling, and a deadline a floor can overrule is
-not a deadline.
+the wave covers every angle the verdict needs no overruling, and a floor would overrule the
+deadline.
 **Note.** Scout spend is reported as `scoutSpent` and never charged to `RESEARCH_SUBREQUEST_BUDGET`;
 folding it in ended depth rounds early for money the parent never spent.
 
@@ -120,8 +119,8 @@ writing `done`.
 60 s. The worst case alone (150 s) stopped a five-minute run at 152 s with two rounds of 78 s and
 69 s done. `ROUND_WORST_CASE_MS` derives from `SCOUT_TIMEOUT_MS`: when both were 150 s the
 reservation was the whole headroom.
-**Order in `shouldContinue`.** Time, budget, rounds, `no-new-ground`, `model-done`. Each replaced
-booleans that could all be true at once.
+**Order in `shouldContinue`.** Time, budget, rounds, `no-new-ground`, `model-done`. One cause per
+stop, where separate booleans could all be true at once.
 
 ## The wave reports as it goes
 
@@ -136,7 +135,7 @@ no `usage` means no number rather than zero. Three `quick` runs cost 516k, 548k 
 about three cents each on deepseek flash via OpenRouter. On Workers AI Free that is a large share of
 the day's 10,000 neurons, unmeasured, which the `deep` preset says on the card.
 
-## Reflection had the same two faults
+## Reflection runs on a 240 s budget
 
 The loop's 90 s budget cut a real night at 113.6 s, and the forced final call came back empty with
 every edit already written. `REFLECTION_BUDGET_MS = 240_000`, and the summary is asked for only

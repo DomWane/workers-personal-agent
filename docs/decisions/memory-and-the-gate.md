@@ -2,7 +2,7 @@
 
 The gate exists because unaided self-correction makes reasoning worse (Huang et al., ICLR 2024,
 arXiv 2310.01798), and "newest wins" is that judgement. What it enforces today is narrower than the
-design, and the gap is recorded here.
+design.
 
 ## The gate covers the two writes that destroy something
 
@@ -20,8 +20,7 @@ user is present and has just spoken, and the history the model sees carries no i
 unattended nightly pass has no fallback and is the case the gate was built for. `REFLECTION_PROMPT`
 tells it to send a `thread`; without one the citation resolves against `reflection`, which is never
 in the registry, and the model is told its thread was deleted, the one refusal that is false. This
-is why `delete_memory` advertises both fields as optional; the drift that forced the question is in
-[tool-boundary.md](tool-boundary.md).
+is why `delete_memory` advertises both fields as optional.
 
 ## Citations name a position, not an id
 
@@ -34,8 +33,8 @@ indistinguishable from a fabricated citation. deepseek-v4-flash cited `"[1]"` wi
 
 `save()` requires `source: { thread, turn?, at }`, written as flat `source_*` frontmatter keys
 because the parser reads one `key: value` a line. A memory from before this existed has none: old,
-not suspect. Archiving files its grounds as `archived_because_*` for the same reason a log line
-three days later cannot: a fact destroyed for a reason nobody can find looks like a whim. Not built:
+not suspect. Archiving files its grounds as `archived_because_*` on the file itself, because Workers
+Logs keep a log line for three days. Not built:
 resolving a memory's own pointer back to its turn, so the "source deleted" case cannot arise yet.
 
 ## Ratings are collected and nothing reads them yet

@@ -52,9 +52,8 @@ file.
 
 ## Clients call RPCs and never write state
 
-SDK connections are read-only, and `client.call` requires the `@callable` decorator. Slash commands
-parsed server-side were dropped with the second channel; `/<skill-slug>` stays because it is the
-one action with no button.
+SDK connections are read-only, and `client.call` requires the `@callable` decorator. The only slash
+command parsed server-side is `/<skill-slug>`, because it is the one action with no button.
 
 ## The report is fetched on demand
 

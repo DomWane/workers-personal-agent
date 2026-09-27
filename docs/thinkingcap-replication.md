@@ -49,12 +49,12 @@ the median across its seeds.
 
 **Corpus.** My own Claude Code transcripts, which stay on the machine that produced them: not in
 the repository, not shared, and never quoted. Questions and findings are described in this
-document instead. The harness reproduces, the result does not.
+document instead.
 
 ## 2. What the first run could not settle, and what fixing it cost
 
 The first version ran both models through commercial aggregators at temperature 0, one pass. It is
-kept in the repository and superseded, for two reasons found afterwards.
+kept in the repository and superseded, for two reasons.
 
 **Neither side's precision was known.** OpenRouter lists nine endpoints for `qwen/qwen3.6-27b`:
 seven declare fp8, two declare nothing, none offers bf16. No provider was pinned and none was
@@ -143,8 +143,7 @@ not have demonstrated a small one.
 
 One thing argues against a hidden degradation without quantifying it: the tie rate is the same
 whether or not retrieval put a relevant chunk in the context, 15 of 18 against 9 of 12. The ties
-are not an artefact of questions that had no available answer. Where answering was possible, the
-two models answered alike.
+are not an artefact of questions that had no available answer.
 
 **Blindness check**, specified before judging: the longer answer won 2 of 6 decided pairs,
 [9.7%, 70.0%], which is indistinguishable from chance, so verdicts did not track length.
@@ -171,11 +170,10 @@ both presentations.
 
 The disagreements are systematic. The judge is more decisive than the human (10 decided pairs
 against 6), and six of the nine disagreements are the human calling a tie where the judge picked a
-side. On top of that, more than a quarter of its verdicts depend on which answer came first.
+side.
 
-So the larger set was not judged automatically, which is what the gate was for. The negative
-result is reported rather than dropped: on this corpus an automated judge does not reproduce human
-preference well enough to substitute for it.
+So the larger set was not judged automatically: on this corpus an automated judge does not
+reproduce human preference well enough to substitute for it.
 
 ## 7. Retrieval is the binding constraint
 
@@ -186,7 +184,7 @@ the sample is measuring refusal.
 
 Closing that gap is the obvious next step and was not taken. `bge-m3` finds a relevant chunk in its
 top 3 on 53% of hard queries against 73% in its top 50, and a stronger multilingual embedder is the
-likeliest way to reach it. Doing it honestly is more than one API call: the ground truth here was
+likeliest way to reach it. Doing it is more than one API call: the ground truth here was
 pooled over seven retrieval systems, and an eighth would be scored against ground truth it never
 contributed to. That bias was already measured and closed once in this project, at the cost of 67
 fresh judgments.

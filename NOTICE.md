@@ -1,7 +1,7 @@
 # Third-party components
 
 This project is MIT-licensed — see [LICENSE](LICENSE). The files below came from elsewhere and keep
-the licence they arrived under; MIT covers everything else.
+the licence they arrived under.
 
 `web/src/components/` holds source copied from two component registries. Both are copy-paste
 registries rather than runtime packages: their CLI writes the source into the project, where it is

@@ -11,8 +11,6 @@ Durable Object. Every bug found on 2026-08-17 lived in exactly that gap:
 - the compaction threshold measured against the conservative default window until something forced
   a lookup, so a model *smaller* than that default never triggered a compaction on its own.
 
-None of the three would have failed a unit test, and all three took under a minute to see by hand.
-
 ## Setup
 
 Two terminals, and no provider spend: the stub answers every completion and serves its own
@@ -46,10 +44,6 @@ The catalogue the stub serves is two models, chosen so the thresholds are arithm
 | `stub-large` | 200,000 | 160,000 | 50,000 |
 | `stub-small` | 8,000 | 6,400 | 2,000 |
 
-**Reload with the cache bypassed** (⇧⌘R) after restarting the Worker: `/api/models` is served with
-`max-age=3600` and the browser will otherwise show the previous run's model list — which reads as a
-bug and is not one.
-
 ## Scenarios
 
 Each seeds a **real thread** (not the `main` landing — a message sent from there starts a new thread,
@@ -66,8 +60,8 @@ node scripts/seed-web-chat.mjs --scenario chat         # the original UI tour: m
 
 `--tokens` overrides the reported prompt size and `--model` the override the thread runs on; both
 default to values derived from the seeded text, because a fixture that claims 150k tokens over 15k of
-messages makes the threshold fire and then find nothing to evict — which looks like a broken feature
-and is a broken fixture. That mistake is why the numbers are computed rather than typed.
+messages makes the threshold fire and then find nothing to evict, which is why the numbers are
+computed rather than typed.
 
 ## Walkthrough
 
@@ -85,18 +79,16 @@ Open `http://localhost:8787/`, type anything, send.
 Send a second message **while the first is still answering** (this is what `STUB_DELAY_MS` buys):
 
 - both questions and both answers land, in order
-- neither answer is attached to the wrong question — this was broken until 2026-08-17: turn one
-  rewrote turn two's text with its own, and turn two read turn one's question as an assistant line
+- neither answer is attached to the wrong question: the failure is turn one rewriting turn two's
+  text with its own, and turn two reading turn one's question as an assistant line
 
-**That very first message is its own check**, and it was broken until 2026-08-31. Sending from the
-landing page creates the thread, which switches the socket, and the send raced the new handshake:
-the message was refused and lost, every time, with the header admitting *Disconnected*. The `ready`
-promise existed for exactly that case and was unreachable — the `connected` guard above it returned
-first. So: **send from `/`, not from a thread**, and watch the message survive the switch. A queued
-outbox was rejected as the fix; it would deliver into a thread the user had already left.
+**That very first message is its own check.** Sending from the landing page creates the thread,
+which switches the socket, so the send races the new handshake; the failure is the message refused
+and lost with the header showing *Disconnected*. **Send from `/`, not from a thread**, and watch the
+message survive the switch. A queued outbox was rejected as the fix; it would deliver into a thread
+the user had already left.
 
-The other half of that guard is worth checking in the same minute, because the fix could have cost
-it: stop the Worker (⌃C in terminal 2) and send. The toast must be **immediate** — measured at 3 ms
+The other half of that guard: stop the Worker (⌃C in terminal 2) and send. The toast must be **immediate** — measured at 3 ms
 — not after the handshake bound. A dropped socket keeps the previous connection's already-resolved
 `ready`, so nothing waits; only a page load against a dead Worker spends the full 5 s.
 
@@ -210,8 +202,8 @@ Since 2026-09-01 a turn's calls and results are persisted, so `state.messages` h
 must never draw and the model must always get. Section 7 proves the model half over `/dev/chat`;
 this one needs the browser, because the failure is a bubble that should not exist.
 
-Same two terminals as section 7, then **send from `/`, not from a thread** — that path was losing
-its message until 2026-08-31 and is the one a stranger hits first. Ask `dump vault`, then in a
+Same two terminals as section 7, then **send from `/`, not from a thread** — that path is the one a
+stranger hits first. Ask `dump vault`, then in a
 second turn `read ref 1`.
 
 Verified this way on 2026-09-01:
@@ -252,8 +244,7 @@ stage: 'archive-failed'          both attempts at the row failed; the page is un
 
 ### 7c. Compacting a thread that holds tool traffic
 
-The one path nothing had walked until 2026-09-01, and the one where the two new guards are the
-difference between a thread that survives and a thread that is dead. Continue straight from 7b —
+Continue straight from 7b —
 the two exchanges it leaves are exactly the fixture — and press **Compact**.
 
 - **Compact is enabled now and was disabled after the first turn.** Eight messages in state, two
@@ -271,16 +262,14 @@ assistant 0 (tool_calls) · tool 4227 (tool_call_id) · assistant 41
 - the user turn *above* that assistant is evicted while its answer stays. That reads oddly on
   screen and is correct: the boundary may only move to a whole group, and the summary describes the
   question that went
-- **send one more message.** This is the half that matters — a compacted thread with tool traffic
-  still has to be sendable. The answer arrives and the log carries no `unpaired-tool-traffic`
+- **send one more message.** A compacted thread with tool traffic must still be sendable. The
+  answer arrives and the log carries no `unpaired-tool-traffic`
 
-**What this found the first time it was run:** with `STUB_TOOLS=1` the stub answered the
-*summarizing* call with a tool call, since the transcript it is handed quotes the user's own
-trigger words. `chatCompletion` then returned `''`, and compaction wrote the empty string over
-`historySummary` — the head is archived by then, so the running summary was the only description
-of it left. Both halves are fixed: the stub returns plain text for a summarizing prompt, and an
-empty answer now keeps the previous summary and logs `stage: 'empty-summary'`, counting the whole
-head as `unsummarized`. The log for a healthy run carries none of:
+The stub returns plain text for a summarizing prompt: with `STUB_TOOLS=1` the transcript it is
+handed quotes the user's trigger words, which would otherwise draw a tool call. An empty summarizer
+answer keeps the previous summary, logs `stage: 'empty-summary'` and counts the whole head as
+`unsummarized`, because the head is archived by then and the running summary is the only
+description of it left. The log for a healthy run carries none of:
 
 ```
 stage: 'empty-summary'   the summarizer returned nothing; the running summary was kept
@@ -288,17 +277,11 @@ stage: 'unpaired-write'  this turn wrote half a pair
 stage: 'archive-failed'  both attempts at the row failed
 ```
 
-### 7d. Tripping the pruner locally — and the loss that hid it
+### 7d. Tripping the pruner locally
 
-This walkthrough used to say `stage: 'pruned'` was out of reach without a vendor, blaming the
-keyword path for returning one hit. **That diagnosis was wrong**, and chasing it on 2026-09-01
-turned up a real defect instead.
-
-`renderEntries` in `memory.tools.ts` called `truncate` *inside the handler*, so the string the loop
-archived was already cut: three memories rendered 12,213 characters and the row held **4,041**. The
-model's copy was identical either way — the loop applies the same default — but `read_tool_result`
-then offered to return the rest of a result nothing had kept, which is the one thing the archive
-exists to make impossible. The `truncate` call is gone; the loop cuts on the way out.
+`renderEntries` in `memory.tools.ts` does not truncate; the loop cuts on the way out, so the archive
+holds the whole result (three memories render 12,213 characters). A handler that truncates leaves
+`read_tool_result` offering the rest of a result nothing kept.
 
 With the archive whole, the pruner is reachable with no vendor at all. Seed three long memories
 whose index lines all match one word, then:
@@ -326,19 +309,17 @@ stage: 'pruned', round: 2, chars: 7197
 
 **Four rounds, not three, and that is the arithmetic rather than a stub quirk.** The prune runs once
 a round's results have landed and spares the newest, so with `PROTECT_RECENT_RESULTS = 1` the first cut
-is round `N + 3`. A three-round turn reaches the pruner and never trips it — which is why the first
-attempt here logged nothing and looked like a broken path.
+is round `N + 3`. A three-round turn reaches the pruner and never trips it.
 
-**One more thing this found, and it will bite again:** the stub counted `role: 'tool'` over the
-whole message array to decide which round it was in. Tool traffic has been persisted since
-2026-09-01, so an earlier turn's results made round 0 look like round 1 and the first tool call was
-silently skipped. It counts from the last user message now. Anything else written against this
-stub's shape before that date is worth re-reading for the same assumption.
+The stub counts `role: 'tool'` from the last user message to decide which round it is in. Tool
+traffic has been persisted since 2026-09-01, so counting over the whole array makes an earlier
+turn's results turn round 0 into round 1 and skip the first tool call. Anything written against
+this stub's shape before that date is worth re-reading for the same assumption.
 
 ### 7e. A ref read *after* a compaction
 
-The claim the archive is for, and nothing walked it until 2026-09-01: a pointer stays good for the
-life of the thread, not for the life of the surface. Continue from 7c — the thread is folded and
+The claim the archive is for: a pointer stays good for the life of the thread, not for the life of
+the surface. Continue from 7c — the thread is folded and
 the `tool` row that carried ref 1 is gone from `state.messages` — and ask `read ref 1` again.
 
 - the answer comes back and the log shows `chars="0-12213 of 12213"`: the *whole* result, read out
@@ -351,7 +332,7 @@ rather than the thing that outlives it.
 ### 7f. Two tabs on one thread
 
 `setState` persists **and** broadcasts, and that is the whole delivery mechanism — there is no
-sending code anywhere. Nothing checked the broadcast half by hand, because one tab cannot.
+sending code anywhere. One tab cannot check the broadcast half.
 
 Open the same `?t=…` in a second tab, then:
 
@@ -364,8 +345,7 @@ every connected client sees, `userProfile` and finished reports included.
 
 ### 7g. Deleting a thread while a turn is running
 
-`deleteThread` is the compaction id guard's stated racer, and the comment says so while nothing had
-ever run it. Send `read ref 1 twice` (four rounds, ~6 s at `STUB_DELAY_MS=1500`), wait about two
+`deleteThread` is the compaction id guard's stated racer. Send `read ref 1 twice` (four rounds, ~6 s at `STUB_DELAY_MS=1500`), wait about two
 seconds, then delete the thread from the sidebar and confirm.
 
 Verified 2026-09-01:
@@ -375,7 +355,7 @@ Verified 2026-09-01:
 - the deleted instance reads back empty over its own socket: `messages: 0`, no `historySummary`,
   no `status` left set
 
-**What this does not establish**, and the doc should not pretend otherwise: whether the guard
+**What this does not establish**: whether the guard
 refused the write or the delete simply landed after it. The outcome is right either way; telling
 the two apart needs the delete to land between the model's answer and the `setState`, which this
 by-hand timing cannot aim at.
@@ -386,7 +366,7 @@ by-hand timing cannot aim at.
 to `resultCap` afterwards. Where the model's window is the tighter bound the two disagree, and the
 reply then advertises an offset past text that never arrived — a model following `more=` skips the
 gap for good. It is the one place the absolute-versus-window mismatch produces a wrong *instruction*
-rather than a smaller view, and it needs the browser for a reason worth stating: **`contextTokens`
+rather than a smaller view, and it needs the browser: **`contextTokens`
 is populated by `setModel` and by compaction, and by nothing else**, so a `curl` at `/dev/chat`
 cannot reach the state this depends on. Picking the model in the UI *is* the path under test.
 
@@ -432,7 +412,7 @@ mean is the production vault — `read_page` reaches Browser Rendering over its 
 npx wrangler dev --local     # no --var: the real provider is the point
 ```
 
-Two traps ahead of the run itself, both cost a few minutes:
+Two traps ahead of the run itself:
 
 - **`/research <topic>` is not a command any more.** The `deep_research` tool was removed
   2026-08-23 ([research.md](decisions/research.md)); typing it just asks the model, which answers
@@ -444,7 +424,7 @@ Two traps ahead of the run itself, both cost a few minutes:
   `/1049k` the real one.
 
 Walked 2026-09-03 on `deepseek/deepseek-v4-flash`, four angles, `stopCause: 'time'` — the bound
-meant to fire. What it settled, and none of it could be settled by a unit test:
+meant to fire. What it settled:
 
 ```
 stage: 'wave'   angles: 4, failed: 0, unread: 0, reads: 14, scoutSpent: 116
@@ -454,28 +434,25 @@ stage: 'report-written'  8,272 chars from 4 rounds
 0 × archive-failed, ungrounded-citations, unavailable
 ```
 
-- **The pruner fired inside scouts, which had never once happened.** `shorten()` returns its input
-  untouched without a ref, so before the scout archive landed every one of those 201,083 characters
-  was re-sent whole each remaining round. One prune alone was 92,927. Read the `turnId` to see
+- **The pruner fired inside scouts.** `shorten()` returns its input untouched without a ref, so
+  without the scout archive every one of those 201,083 characters is re-sent whole each remaining
+  round. One prune alone was 92,927. Read the `turnId` to see
   whose: a wave's scouts inherit the round's id, so four `tool-loop` records with `seq: 0` under one
   `turnId` are four concurrent scout loops, and that is where the prunes sit.
 - **The scouts pulled their own pages back, three times, unprompted.** Nothing in the prompt
-  mentions `read_tool_result`; the only affordance is the marker inside a pruned result. That was an
-  open question — whether a model shortens a page and then never asks for the rest — and one run
-  answered it.
+  mentions `read_tool_result`; the only affordance is the marker inside a pruned result.
 - **`read_page` failed 14 times of 30, and the cause is a documented ceiling rather than a bug.**
   5 reads served by Browser Rendering, 11 by the Firecrawl fallback, 14 lost. The error is
   Cloudflare's own envelope (`code: 2001, Rate limit exceeded`), so the **primary** is what a wave
   of four concurrent scouts outruns. The ceiling is tighter than it looks: `/browser-rendering/markdown`
   is a **Quick Action**, capped on the Free plan at one request every ten seconds — not a Browser
-  Session, whose 3-concurrent limit is the one this walkthrough first blamed.
+  Session, whose limit is 3 concurrent.
 
-  **Two of the four scouts then stopped on `no-progress`, and that was a bug this run found.** The
+  **Two of the four scouts stopped on `no-progress`, a bug fixed 2026-09-03.** The
   repeat guard keyed on the tool name and its result, so four reads of four different pages behind
   one rate limit produced four identical `error:` strings and read as a model going in circles. The
   arguments are now part of the key: a different question is progress whatever comes back, and a
-  model that truly loops repeats its arguments too. Fixed 2026-09-03; the run that found it is the
-  one recorded above, which is the argument for walking this by hand.
+  model that truly loops repeats its arguments too.
 
 ### 8. The nightly pass, against a real model
 
@@ -517,8 +494,7 @@ What to look for, verified this way on 2026-08-18:
 - the nightly record carries `citationsRefused` — if that number is not zero, the gate is refusing
   citations the model believes in, and memory curation is quietly stopping
 - `skillsArchived` in the same record counts the **staleness sweep over skills** and never a
-  memory. It was called `archived` until 2026-09-01, which read as a contradiction against a
-  `sample` line saying a memory had just been archived
+  memory
 
 Verified again on 2026-09-01 against `deepseek/deepseek-v4-flash`, with **local** storage:
 `npx wrangler dev --local` reads the same `.env` and calls the same provider while the seeded

@@ -7,8 +7,7 @@ later. This is the evaluation I built to decide how it should search that memory
 written the way I ask them. Czech stemming closes about a fifth of that gap at no inference cost.
 Static word vectors, unweighted and mean-pooled, are not competitive here; §7 says how narrow that
 result is. Neither hybrid fusion nor a cross-encoder reranker improved on plain dense retrieval
-(§4). Five measurements were wrong before they were right. §6 lists them, because they are the
-part that transfers to other projects.
+(§4). Five measurements were wrong before they were right; §6 lists them.
 
 ## 1. Data
 
@@ -19,7 +18,7 @@ agent itself.
 
 The corpus is my own working sessions and stays on the machine that produced it. It is not in the
 repository, not shared, and nothing in it is quoted here; questions and findings are described
-rather than reproduced. The harness reproduces, the result does not.
+rather than reproduced.
 
 ## 2. Labels
 
@@ -30,7 +29,7 @@ about half. Each generated query is scored for word overlap with its source chun
 above a threshold, so the set does not degenerate into "find the chunk containing these words".
 
 **hard (n=30).** Questions written from my own notes months after the work, wording locked before
-the corpus was searched. The labelling tool enforces two rules that good intentions would not:
+the corpus was searched. The labelling tool enforces two rules:
 
 - **The query cannot be edited after searching.** A question revised once its answer is on screen
   drifts into the answer's vocabulary.
@@ -110,14 +109,12 @@ candidate window. I built and measured both.
 
 Weighting the fusion towards the stronger retriever reduces the damage monotonically and converges
 on plain dense. There is no weight at which fusion helps. The reranker moved the relevant chunk
-**up for 6 bulk queries and down for 28**, which is the failure a reranker exists to fix, happening
-in reverse.
+**up for 6 bulk queries and down for 28**.
 
 **The recall headroom is real and fusion cannot reach it.** The union of both top-20 lists covers 24
 of 30 hard queries against dense's 20, and the stemmed BM25 finds a relevant chunk dense misses
 entirely on 4. But those chunks sit at ranks 10 to 20 of a list whose first ten are wrong, and RRF
-at k=60 cannot lift a rank-12 entry past a rank-2 one from a retriever 0.13 nDCG stronger. Fusion
-only works when its inputs are comparable, and these are not.
+at k=60 cannot lift a rank-12 entry past a rank-2 one from a retriever 0.13 nDCG stronger.
 
 **The reranker's failure is not truncation.** Re-run at 600, 1600 and 3000 characters per
 candidate, the scores are identical within noise (hard 0.338 / 0.335 / 0.336), which also suggests
@@ -140,22 +137,19 @@ ground truth had been penalising it; the remainder is the model. Fusion did not 
 figures stay unpooled, so they remain floors, and the bulk deficits are large enough that no
 plausible number of missed relevant chunks would reverse them.
 
-## 5. The design decisions that carried the weight
+## 5. Design decisions
 
 **Content-addressed chunk ids.** A chunk's id is a hash of the raw exchange, taken at ingest
 *before* any of the text rules that follow it, so changing one of them rewrites every chunk's text
 but not its identity. That preserved the labelling across five changes in one day. The hashing
 happens locally, and the raw exchange never leaves the machine it was read on.
 
-**Unranked search during labelling** (§2) is the single decision that keeps the hard set from
-measuring the retriever that helped build it.
-
 **Fail-closed guards.** The runner refuses to start if a labelled query lacks a vector, if
 embedded ids do not match the corpus, or if the stored text hash differs. Without the first, two
 newly added queries would have scored a uniform zero, dragged the mean down, and looked like a
 regression caused by adding queries.
 
-**Recording bias rather than arguing it away.** Where a hand-edited query or a search-located
+**Recording bias.** Where a hand-edited query or a search-located
 target could have leaked, the row carries a flag and the runner reports those rows against their
 complement. Hand-edited queries score higher for every lexical retriever (BM25 0.37 against 0.18,
 stemmed BM25 0.47 against 0.24) and *lower* for bge-m3 (0.48 against 0.53): the edits added words,
@@ -164,7 +158,7 @@ rather than a measurement.
 
 ## 6. Five silent failures, and what caught each
 
-Each produced a plausible number. None failed loudly, which is why they are listed.
+Each produced a plausible number. None failed loudly.
 
 **1. The corpus ingested the conversation that built the eval.** Seven of the sixty queries
 labelled at that point appeared word for word in chunks, because those chunks were transcripts of
@@ -180,8 +174,7 @@ that moment had been partly contamination.
 
 **2. A hardcoded cap made an experiment measure nothing.** Testing whether longer chunks retrieve
 better, caps of 2400 and 3600 characters produced byte-identical numbers, because the embedding
-step truncated its input at 1600. It read as a clean null result, which is exactly what an
-unnoticed no-op looks like. The same investigation surfaced a vector cache that invalidated on
+step truncated its input at 1600. The same investigation surfaced a vector cache that invalidated on
 corpus text but not on embedding parameters, so raising the limit silently reused stale vectors.
 
 **3. Two judging standards in one pool.** I judged the first half leniently and the second half
@@ -189,14 +182,12 @@ strictly: 22% acceptance, then 1.6%. Rather than redo the strict half I re-judge
 acceptances against the strict standard and withdrew seven, mostly chunks from the same *topic*
 but a different *episode*. That cost 0.06 nDCG on the hard set and the conclusion held: dense over
 BM25 was +0.228 [0.042, 0.413] before and +0.200 [0.024, 0.379] after. The table in §3 still
-reports that point estimate, on an interval later judging narrowed to [0.070, 0.326]. A single
-lenient pass could not have shown that the result was not an artifact of generous judging.
+reports that point estimate, on an interval later judging narrowed to [0.070, 0.326].
 
 **4 and 5. Pool bias, twice.** I added stemmed BM25 to the runner and forgot the judging pool. A
 system left out of the pool contributes no relevant chunks and is then measured against ground
 truth the others built, so it loses quietly and nothing fails. Including it added 31 candidates
-only it surfaced. I then repeated the mistake with fastText and caught it while re-reading my own
-paragraph about the stemmer; judging its 84 unique candidates moved its hard score from 0.047 to
+only it surfaced. The same omission happened with fastText; judging its 84 unique candidates moved its hard score from 0.047 to
 0.057.
 
 ## 7. Limits
