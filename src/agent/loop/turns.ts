@@ -15,16 +15,17 @@ export interface Turn {
   final?: SpokenMessage
 }
 
-export const DRAFT_ID = 'draft'
-
 export function groupTurns(messages: HistoryMessage[], draft?: string): Turn[] {
   const turns: Turn[] = []
   const pending = new Map<string, ToolStep>()
   let open: Turn | null = null
+  let asked = 'start'
+  let replies = 0
 
+  const reply = (): Turn => ({ from: 'assistant', id: `${asked}:${replies++}`, segments: [] })
   const close = (final?: SpokenMessage) => {
     if (open) {
-      turns.push(final ? { ...open, id: final.id, final } : open)
+      turns.push(final ? { ...open, final } : open)
       open = null
       pending.clear()
     }
@@ -34,6 +35,8 @@ export function groupTurns(messages: HistoryMessage[], draft?: string): Turn[] {
     if (m.role === 'user') {
       close()
       turns.push({ from: 'user', id: m.id, segments: [{ kind: 'text', message: m }], final: m })
+      asked = m.id
+      replies = 0
       continue
     }
     if (m.role === 'tool') {
@@ -43,7 +46,7 @@ export function groupTurns(messages: HistoryMessage[], draft?: string): Turn[] {
       }
       continue
     }
-    open ??= { from: 'assistant', id: m.id, segments: [] }
+    open ??= reply()
     if (m.content) {
       open.segments.push({ kind: 'text', message: m })
     }
@@ -57,8 +60,8 @@ export function groupTurns(messages: HistoryMessage[], draft?: string): Turn[] {
     }
   }
   if (draft) {
-    open ??= { from: 'assistant', id: DRAFT_ID, segments: [] }
-    open.segments.push({ kind: 'text', message: { role: 'assistant', content: draft, id: DRAFT_ID } })
+    open ??= reply()
+    open.segments.push({ kind: 'text', message: { role: 'assistant', content: draft, id: 'draft' } })
   }
   close()
   return turns

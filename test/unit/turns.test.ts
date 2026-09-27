@@ -36,8 +36,9 @@ describe('groupTurns', () => {
 
     expect(turns.map((t) => [t.from, t.id])).toEqual([
       ['user', 'u1'],
-      ['assistant', 'a3'],
+      ['assistant', 'u1:0'],
     ])
+    expect(turns[1].final?.id).toBe('a3')
     expect(turns[1].final?.tokens).toBe(12)
     expect(
       turns[1].segments.map((s) =>
@@ -54,20 +55,28 @@ describe('groupTurns', () => {
 
   it('keeps an answer with no steps before it as a turn of its own', () => {
     const turns = groupTurns([user('u1'), answer('a1'), answer('a2', 'Reminder: standup')])
-    expect(turns.map((t) => t.id)).toEqual(['u1', 'a1', 'a2'])
+    expect(turns.map((t) => t.id)).toEqual(['u1', 'u1:0', 'u1:1'])
     expect(turns[2].segments).toEqual([{ kind: 'text', message: expect.objectContaining({ id: 'a2' }) }])
   })
 
-  it('leaves a running turn open, with no final and the first step as its id', () => {
+  it('leaves a running turn open, with no final', () => {
     const turns = groupTurns([user('u1'), step('a1', 'Looking…', [call('c1')]), result('t1', 'c1')])
-    expect(turns[1]).toMatchObject({ from: 'assistant', id: 'a1' })
+    expect(turns[1]).toMatchObject({ from: 'assistant', id: 'u1:0' })
     expect(turns[1].final).toBeUndefined()
     expect(turns[1].segments).toHaveLength(2)
   })
 
+  it('keeps a turn id from draft to live steps to landed answer, so the client never remounts it', () => {
+    const drafting = groupTurns([user('u1')], 'Looking')
+    const running = groupTurns([user('u1'), step('live-1', 'Looking', [call('c1')]), result('live-2', 'c1')])
+    const landed = groupTurns([user('u1'), step('a1', 'Looking', [call('c1')]), result('t1', 'c1'), answer('a2')])
+
+    expect([drafting[1].id, running[1].id, landed[1].id]).toEqual(['u1:0', 'u1:0', 'u1:0'])
+  })
+
   it('closes an open turn at the next user message, and ignores a result whose call is not in it', () => {
     const turns = groupTurns([user('u1'), step('a1', '', [call('c1')]), user('u2'), result('t9', 'c1'), answer('a2')])
-    expect(turns.map((t) => t.id)).toEqual(['u1', 'a1', 'u2', 'a2'])
+    expect(turns.map((t) => t.id)).toEqual(['u1', 'u1:0', 'u2', 'u2:0'])
     expect(turns[3].segments).toEqual([{ kind: 'text', message: expect.objectContaining({ id: 'a2' }) }])
   })
 
@@ -80,14 +89,14 @@ describe('groupTurns', () => {
     expect(open[1].final).toBeUndefined()
 
     const alone = groupTurns([user('u1')], 'Writing')
-    expect(alone.map((t) => t.id)).toEqual(['u1', 'draft'])
+    expect(alone.map((t) => t.id)).toEqual(['u1', 'u1:0'])
     expect(alone[1].final).toBeUndefined()
 
-    expect(groupTurns([user('u1'), answer('a1')], 'Writing').map((t) => t.id)).toEqual(['u1', 'a1', 'draft'])
+    expect(groupTurns([user('u1'), answer('a1')], 'Writing').map((t) => t.id)).toEqual(['u1', 'u1:0', 'u1:1'])
   })
 
   it('treats an empty tool_calls list as an answer, the way the thread filter does', () => {
     const turns = groupTurns([{ role: 'assistant', content: 'plain', id: 'a1', tool_calls: [] }])
-    expect(turns[0]).toMatchObject({ id: 'a1', final: { id: 'a1' } })
+    expect(turns[0]).toMatchObject({ id: 'start:0', final: { id: 'a1' } })
   })
 })
